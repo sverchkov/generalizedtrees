@@ -1,0 +1,4 @@
+venv
+# PyCharm files
+*.xml
+*.iml
