@@ -29,6 +29,47 @@ class Constraint(ABC):
         pass
 
 
+class LEQConstraint(Constraint):
+
+    def __init__(self, feature_index, value):
+        self.feature_index = feature_index
+        self.value = value
+
+    def test(self, sample):
+        return sample[self.feature_index] <= self.value
+
+    def __invert__(self):
+        return GTConstraint(self.feature_index, self.value)
+
+    def __repr__(self):
+        return f"[{self.feature_index}]<={self.value}"
+
+
+class GTConstraint(Constraint):
+
+    def __init__(self, feature_index, value):
+        self.feature_index = feature_index
+        self.value = value
+
+    def test(self, sample):
+        return sample[self.feature_index] > self.value
+
+    def __invert__(self):
+        return LEQConstraint(self.feature_index, self.value)
+
+    def __repr__(self):
+        return f"[{self.feature_index}]>{self.value}"
+
+
+class SimplePredictor:
+
+    def __init__(self, prediction):
+        self.prediction = prediction
+
+    def predict(self, sample):
+        return self.prediction
+
+
 class Node:
 
     def __init__(self, constraint: Constraint = None, parent: Node = None):
@@ -40,7 +81,7 @@ class Node:
     def all_constraints(self):
         if self.parent:
             return self.parent.all_constraints.append(self.constraint)
-        elif self.constraint:
+        elif self.constraint is not None:
             return [self.constraint]
         else:
             return []
@@ -104,7 +145,7 @@ class GeneralTreeClassifier(BaseEstimator, ClassifierMixin):
         return self.best_split_function(node.all_constraints)
 
     def leaf_predictor(self, node: Node):
-        return self.leaf_predictor_factory(node)
+        return self.leaf_predictor_factory(node.all_constraints)
 
     def build(self):
         self.root = Node()
