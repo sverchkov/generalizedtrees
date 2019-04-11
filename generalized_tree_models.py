@@ -16,10 +16,12 @@
 
 from __future__ import annotations
 from sklearn.base import BaseEstimator, ClassifierMixin
-from typing import List
+from typing import List, Tuple
 from abc import ABC, abstractmethod
 from collections import deque
 import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Constraint(ABC):
@@ -69,6 +71,9 @@ class SimplePredictor:
     def predict(self, sample):
         return self.prediction
 
+    def __repr__(self):
+        return f'Predict: {self.prediction}'
+
 
 class Node:
 
@@ -78,13 +83,18 @@ class Node:
         self.model = None
 
     @property
-    def all_constraints(self):
+    def all_constraints(self) -> () or Tuple[Constraint]:
         if self.parent:
-            return self.parent.all_constraints.append(self.constraint)
+            if self.constraint is None:
+                logger.error(f'Node {self} with parent {self.parent}. This is a bad constraint configuration.')
+            return self.parent.all_constraints + (self.constraint,)
         elif self.constraint is not None:
-            return [self.constraint]
+            return self.constraint,  # Trailing comma because this is a tuple
         else:
-            return []
+            return ()
+
+    def __repr__(self):
+        return f'({self.constraint}: {self.model})'
 
 
 class ChildSelector:
@@ -98,20 +108,26 @@ class ChildSelector:
                 return c.model.predict(sample)
         return None  # Maybe throw exception here?
 
+    def __repr__(self):
+        return self.children.__repr__()
+
 
 class NodeQueue:
 
     def __init__(self):
         self.q = deque()
 
-    def insert(self, x):
+    def append(self, x):
         self.q.append(x)
 
-    def insert_all(self, xs):
+    def extend(self, xs):
         self.q.extend(xs)
 
     def pop(self):
         return self.q.popleft()
+
+    def __len__(self):
+        return len(self.q)
 
 
 class GeneralTreeClassifier(BaseEstimator, ClassifierMixin):
@@ -129,8 +145,8 @@ class GeneralTreeClassifier(BaseEstimator, ClassifierMixin):
         a class prediction for a standard decision tree) Leaf predictors must implement predict(sample)
         :param sequential_access_data_structure_factory: A  factory that produces a data structure such as a stack,
         queue, or priority queue that determines the order in which the tree is built. For a priority queue the rule for
-        comparing nodes is also communicated through this function. The data structure must implement insert (for one
-        element), insert_all (for a list of elements) and pop.
+        comparing nodes is also communicated through this function. The data structure must implement append (for one
+        element), extend (for a list of elements) and pop.
         """
         assert callable(best_split_function), "Best split function must be callable"
         assert callable(leaf_predictor_factory), "Leaf predictor factory must be callable"
@@ -150,23 +166,29 @@ class GeneralTreeClassifier(BaseEstimator, ClassifierMixin):
     def build(self):
         self.root = Node()
         nodes = self.sequential_access_data_structure_factory()
-        nodes.insert(self.root)
+        nodes.append(self.root)
 
         while nodes:
             parent = nodes.pop()
             split = self.best_split(parent)
 
+            logger.log(5, f'building: {self}')
+            logger.log(5, f'best split: {split}')
+
             if len(split) > 1:  # Splitting
                 children = [Node(s, parent) for s in split]
+                logger.log(5, f'setting children: {children}')
                 parent.model = ChildSelector(children)
-                nodes.insert_all(children)
+                nodes.extend(children)
 
             else:  # It's a leaf
                 parent.model = self.leaf_predictor(parent)
 
     def predict(self, data):
-        [self.predict_instance(x) for x in data]
+        return [self.predict_instance(x) for x in data]
 
     def predict_instance(self, sample):
-        self.root.model.predict(sample)
+        return self.root.model.predict(sample)
 
+    def __repr__(self):
+        return f"Tree: {self.root}"
