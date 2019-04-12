@@ -192,3 +192,11 @@ class GeneralTreeClassifier(BaseEstimator, ClassifierMixin):
 
     def __repr__(self):
         return f"Tree: {self.root}"
+
+
+def test_all_x(constraints):
+    return lambda x: all([c.test(x) for c in constraints])
+
+
+def test_all_xy(constraints):
+    return lambda pair: test_all_x(constraints)(pair[0])
