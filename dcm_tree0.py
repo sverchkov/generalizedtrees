@@ -20,7 +20,6 @@ import generalized_tree_models as gtm
 import numpy as np
 from numpy.random import multivariate_normal
 from scipy.stats import mode
-from sklearn.metrics import classification_report
 from typing import Tuple
 import logging
 
@@ -102,6 +101,7 @@ if __name__ == "__main__":
     from sklearn import datasets
     from sklearn.svm import SVC
     from sklearn.tree import DecisionTreeClassifier
+    from sklearn.metrics import classification_report
 
     logging.basicConfig(level=5)
 
