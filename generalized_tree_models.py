@@ -198,5 +198,5 @@ def test_all_x(constraints):
     return lambda x: all([c.test(x) for c in constraints])
 
 
-def test_all_xy(constraints):
+def test_all_tuples(constraints):
     return lambda pair: test_all_x(constraints)(pair[0])

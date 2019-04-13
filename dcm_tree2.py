@@ -15,37 +15,86 @@
 # limitations under the License.
 
 import logging
-from generalized_tree_models import GeneralTreeClassifier, SimplePredictor, test_all_x
+from generalized_tree_models import GeneralTreeClassifier, SimplePredictor, LEQConstraint, test_all_x, test_all_tuples
 from scipy.stats import mode
+from numpy import array, inf, transpose, ndarray
+from numpy.random import permutation
+
+
+logger = logging.getLogger()
+
+
+def loss_score(y_hat, y):
+    if len(y_hat) < 1:
+        return inf
+    return sum((array(y) - array(y_hat))**2)
+
+
+def shuffle_features(x: ndarray):
+    assert x.ndim == 2, "Feature matrix must be 2D"
+    return transpose(permutation(transpose(x)))
 
 
 class MimicTreeClassifier(GeneralTreeClassifier):
 
     def __init__(self, classifier):
-        self.test_set = None
         self.y = None
-        self.predictions = None
+        self.y_hat = None
+        self.features = None
+        self.triples = None
         self.classifier = classifier
         super().__init__(self.loss_split_function, self.leaf_factory)
 
     def leaf_factory(self, constraints):
-        if not self.predictions:
+        if not self.triples:
             raise UserWarning("Looks like you tried to build the mimic tree without fitting a test set first!")
 
-        y_hats = [y_i for (X_i, y_i) in self.predictions if test_all_x(constraints)(X_i)]
+        y_hats = [y_i for (X_i, y_i, _) in self.triples if test_all_x(constraints)(X_i)]
         if not y_hats:  # No samples falling in constraints, predict most common class
             return SimplePredictor(mode(self.y)[0])
         else:
             return SimplePredictor(mode(y_hats)[0])
 
     def loss_split_function(self, constraints):
+        index = list(map(test_all_x(constraints), self.features))
+        logger.log(5, index)
+        features = self.features[index]
+        y = self.y[index]
+
+        shuffle_hat = self.classifier.predict(shuffle_features(features))
+
         best_split = []
+        best_score = loss_score(shuffle_hat, y)
+
+        for x_i in features:
+            for feature in range(len(x_i)):
+                left_constraint = LEQConstraint(feature, x_i[feature])
+                right_constraint = ~left_constraint
+
+                left = list(map(left_constraint.test, features))
+                right = list(map(right_constraint.test, features))
+
+                if not any(left) or not any(right):
+                    continue
+
+                left_hat = self.classifier.predict(shuffle_features(features[left]))
+                right_hat = self.classifier.predict(shuffle_features(features[right]))
+
+                candidate_score = loss_score(left_hat, y[left]) + loss_score(right_hat, y[right])
+
+                logger.log(5, f"Best score:{best_score} Left constraint:{left_constraint} Candidate score:{candidate_score}")
+
+                if candidate_score < best_score:
+                    best_score = candidate_score
+                    best_split = [left_constraint, right_constraint]
+
         return best_split
 
     def fit(self, features, target):
+        self.features = features
         self.y = target
-        self.test_set = zip(features, target)
-        self.predictions = zip(features, self.classifier.predict(features))
+        self.y_hat = self.classifier.predict(features)
+        self.triples = zip(features, self.y_hat, target)
         self.build()
 
 
