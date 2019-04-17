@@ -14,19 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import generalized_tree_models as gtm
+from generalizedtrees import core as gtm
 import numpy as np
 from numpy.random import multivariate_normal
 from scipy.stats import mode
 from sklearn.metrics import classification_report
+from typing import Tuple
 import logging
 
 
 logger = logging.getLogger(__name__)
 
 
-def constrained_gaussian_sample(means, cov, constraints, quorum=20):
-    logger.debug(f"constraints: {constraints}")
+def constrained_gaussian_sample(means, cov, constraints: Tuple, quorum=20):
     x = []
     while len(x) < quorum:
         x_new = multivariate_normal(means, cov, quorum-len(x))
@@ -35,7 +35,7 @@ def constrained_gaussian_sample(means, cov, constraints, quorum=20):
     return x
 
 
-def gaussian_feature_sampler_leaf_model(means, cov, classifier, constraints, quorum=20):
+def gaussian_feature_sampler_leaf_model(means, cov, classifier, constraints: Tuple, quorum=20):
     x = constrained_gaussian_sample(means, cov, constraints, quorum)
     m, n = mode(classifier.predict(x))
     return gtm.SimplePredictor(m[0])
@@ -52,7 +52,7 @@ def gini(y):
     return 1 - sum(p*p)
 
 
-def gaussian_feature_gini_split_function(means, cov, classifier, constraints, quorum=20):
+def gaussian_feature_gini_split_function(means, cov, classifier, constraints: Tuple, quorum=20):
     parent_sample = constrained_gaussian_sample(means, cov, constraints, quorum)
     best_gini = gini(classifier.predict(parent_sample))
 
@@ -63,21 +63,23 @@ def gaussian_feature_gini_split_function(means, cov, classifier, constraints, qu
             left_constraint = gtm.LEQConstraint(feature, x[feature])
             right_constraint = ~left_constraint
 
-            lcs = constraints.copy()
-            lcs.append(left_constraint)
+            lcs = constraints + (left_constraint,)
 
             left_gini = gini(classifier.predict(constrained_gaussian_sample(means, cov, lcs, quorum)))
 
-            rcs = constraints.copy()
-            rcs.append(right_constraint)
+            left_weight = len([z for z in parent_sample if left_constraint.test(z)])/len(parent_sample)
+
+            rcs = constraints + (right_constraint,)
 
             right_gini = gini(classifier.predict(constrained_gaussian_sample(means, cov, rcs, quorum)))
 
-            candidate_gini = left_gini + right_gini
+            candidate_gini = left_gini * left_weight + right_gini * (1-left_weight)
 
-            if candidate_gini > best_gini:
+            if candidate_gini < best_gini:
                 best_gini = candidate_gini
                 best_split = [left_constraint, right_constraint]
+
+    logger.log(5, best_split)
 
     return best_split
 
@@ -87,8 +89,7 @@ if __name__ == "__main__":
     from sklearn import datasets
     from sklearn.svm import SVC
 
-    logging.basicConfig()
-    logger.setLevel(logging.DEBUG)
+    logging.basicConfig(level=5)
 
     # Load iris
     iris = datasets.load_iris()
@@ -117,6 +118,9 @@ if __name__ == "__main__":
 
     # Build tree
     tree.build()
+
+    # Show tree
+    logger.debug(tree)
 
     # Report tree quality
     print(classification_report(iris.target,

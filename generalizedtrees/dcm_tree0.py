@@ -16,9 +16,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import generalized_tree_models as gtm
+from generalizedtrees import core as gtm
 import numpy as np
-from numpy.random import multivariate_normal
 from scipy.stats import mode
 from typing import Tuple
 import logging
