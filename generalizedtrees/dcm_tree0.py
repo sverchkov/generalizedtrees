@@ -2,7 +2,7 @@
 #
 # This uses the generalized tree model to implement a standard decision tree learner using the Gini criterion
 #
-# Copyright 2019 Yuriy Sverchkov 2019
+# Copyright 2019 Yuriy Sverchkov
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
