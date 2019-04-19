@@ -130,38 +130,36 @@ class NodeQueue:
         return len(self.q)
 
 
-class GeneralTreeClassifier(BaseEstimator, ClassifierMixin):
+class GeneralTreeEstimator(BaseEstimator, ABC):
 
     def __init__(
             self,
-            best_split_function,
-            leaf_predictor_factory,
             sequential_access_data_structure_factory=NodeQueue):
         """
         The general tree classifier is defined by
-        :param best_split_function: Function that determines the best next split given a list of constraints. This
-        function also implicitly defines the type of constraint used throughout the tree via its return method.
-        :param leaf_predictor_factory: A factory for the leaf predictor (e.g. linear model for a linear model tree or
-        a class prediction for a standard decision tree) Leaf predictors must implement predict(sample)
         :param sequential_access_data_structure_factory: A  factory that produces a data structure such as a stack,
         queue, or priority queue that determines the order in which the tree is built. For a priority queue the rule for
         comparing nodes is also communicated through this function. The data structure must implement append (for one
         element), extend (for a list of elements) and pop.
         """
-        assert callable(best_split_function), "Best split function must be callable"
-        assert callable(leaf_predictor_factory), "Leaf predictor factory must be callable"
         assert callable(sequential_access_data_structure_factory),\
             "Sequential access data structure factory must be callable"
         self.root = None
-        self.best_split_function = best_split_function
-        self.leaf_predictor_factory = leaf_predictor_factory
         self.sequential_access_data_structure_factory = sequential_access_data_structure_factory
 
-    def best_split(self, node: Node):
-        return self.best_split_function(node.all_constraints)
+    @abstractmethod
+    def best_split(self, constraints):
+        pass
 
-    def leaf_predictor(self, node: Node):
-        return self.leaf_predictor_factory(node.all_constraints)
+    @abstractmethod
+    def leaf_predictor(self, constraints):
+        pass
+
+    def best_split_of_node(self, node: Node):
+        return self.best_split(node.all_constraints)
+
+    def leaf_predictor_of_node(self, node: Node):
+        return self.leaf_predictor(node.all_constraints)
 
     def build(self):
         self.root = Node()
@@ -170,7 +168,7 @@ class GeneralTreeClassifier(BaseEstimator, ClassifierMixin):
 
         while nodes:
             parent = nodes.pop()
-            split = self.best_split(parent)
+            split = self.best_split_of_node(parent)
 
             logger.log(5, f'building: {self}')
             logger.log(5, f'best split: {split}')
@@ -182,7 +180,7 @@ class GeneralTreeClassifier(BaseEstimator, ClassifierMixin):
                 nodes.extend(children)
 
             else:  # It's a leaf
-                parent.model = self.leaf_predictor(parent)
+                parent.model = self.leaf_predictor_of_node(parent)
 
     def predict(self, data):
         return [self.predict_instance(x) for x in data]
@@ -200,3 +198,7 @@ def test_all_x(constraints):
 
 def test_all_tuples(constraints):
     return lambda pair: test_all_x(constraints)(pair[0])
+
+
+class GeneralTreeClassifier(GeneralTreeEstimator, ClassifierMixin):
+    pass
