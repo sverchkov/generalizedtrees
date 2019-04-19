@@ -18,11 +18,10 @@
 # limitations under the License.
 
 from generalizedtrees import core
-import numpy as np
 from scipy.stats import mode
 from typing import Tuple
 import logging
-
+from generalizedtrees.scores import gini, entropy
 
 logger = logging.getLogger(__name__)
 
@@ -33,29 +32,6 @@ def select(x, y, constraints: Tuple):
         return zip(*tuples)
     else:
         return [], []
-
-
-def gini(y):
-    n = len(y)
-
-    if n == 0:
-        return 0
-
-    p = np.bincount(y)/n
-
-    return 1 - sum(p*p)
-
-
-def entropy(y):
-    n = len(y)
-
-    if n == 0:
-        return 0
-
-    p = np.bincount(y)/n
-    pl2p = np.where(p > 0, -p*np.log2(p), 0)
-
-    return sum(pl2p)
 
 
 class DecisionTreeClassifier(core.GeneralTreeClassifier):
