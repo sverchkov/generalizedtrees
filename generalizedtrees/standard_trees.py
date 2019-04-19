@@ -1,6 +1,7 @@
-# Classifier Tree Model 0
+# Decision Tree Classifier Model
 #
-# This uses the generalized tree model to implement a standard decision tree learner using the Gini criterion
+# This uses the generalized tree model to implement a standard decision tree learner.
+# This is mostly an exercise in showing that the framework encompasses standard decision trees.
 #
 # Copyright 2019 Yuriy Sverchkov
 #
@@ -16,7 +17,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees import core as gtm
+from generalizedtrees import core
 import numpy as np
 from scipy.stats import mode
 from typing import Tuple
@@ -32,12 +33,6 @@ def select(x, y, constraints: Tuple):
         return zip(*tuples)
     else:
         return [], []
-
-
-def training_set_leaf_model(x, y, constraints: Tuple):
-    _, y_subset = select(x, y, constraints)
-    the_mode, _ = mode(y_subset)
-    return gtm.SimplePredictor(the_mode[0])
 
 
 def gini(y):
@@ -63,43 +58,62 @@ def entropy(y):
     return sum(pl2p)
 
 
-def training_set_best_split_function(x, y, constraints: Tuple, score):
-    parent_x, parent_y = select(x, y, constraints)
-    best_score = score(parent_y)
+class DecisionTreeClassifier(core.GeneralTreeClassifier):
 
-    best_split = []
+    def __init__(self, score):
+        assert callable(score)
+        self.score = score
+        self.features = None
+        self.targets = None
+        super().__init__()
 
-    for x_i in parent_x:
-        for feature in range(len(x_i)):
-            left_constraint = gtm.LEQConstraint(feature, x_i[feature])
-            right_constraint = ~left_constraint
+    def best_split(self, constraints):
+        parent_x, parent_y = select(self.features, self.targets, constraints)
+        best_score = self.score(parent_y)
 
-            _, left_y = select(parent_x, parent_y, (left_constraint,))
+        best_split = []
 
-            left_score = score(left_y)
+        for x_i in parent_x:
+            for feature in range(len(x_i)):
+                left_constraint = core.LEQConstraint(feature, x_i[feature])
+                right_constraint = ~left_constraint
 
-            left_weight = len(left_y)/len(parent_y)
+                _, left_y = select(parent_x, parent_y, (left_constraint,))
 
-            _, right_y = select(parent_x, parent_y, (right_constraint,))
+                left_score = self.score(left_y)
 
-            right_score = score(right_y)
+                left_weight = len(left_y) / len(parent_y)
 
-            candidate_score = left_score * left_weight + right_score * (1-left_weight)
+                _, right_y = select(parent_x, parent_y, (right_constraint,))
 
-            if candidate_score < best_score:
-                best_score = candidate_score
-                best_split = [left_constraint, right_constraint]
+                right_score = self.score(right_y)
 
-    logger.log(5, best_split)
+                candidate_score = left_score * left_weight + right_score * (1 - left_weight)
 
-    return best_split
+                if candidate_score < best_score:
+                    best_score = candidate_score
+                    best_split = [left_constraint, right_constraint]
+
+        logger.log(5, best_split)
+
+        return best_split
+
+    def leaf_predictor(self, constraints):
+        _, y_subset = select(self.features, self.targets, constraints)
+        the_mode, _ = mode(y_subset)
+        return core.SimplePredictor(the_mode[0])
+
+    def fit(self, features, targets):
+        self.features = features
+        self.targets = targets
+        self.build()
 
 
 if __name__ == "__main__":
 
     from sklearn import datasets
     from sklearn.svm import SVC
-    from sklearn.tree import DecisionTreeClassifier
+    from sklearn.tree import DecisionTreeClassifier as SKLDTC
     from sklearn.metrics import classification_report
 
     logging.basicConfig(level=5)
@@ -115,14 +129,14 @@ if __name__ == "__main__":
     print(classification_report(iris.target,
                                 svc.predict(iris.data)))
 
-    sk_gini_tree = DecisionTreeClassifier(criterion='gini')
+    sk_gini_tree = SKLDTC(criterion='gini')
     sk_gini_tree.fit(iris.data, iris.target)
 
     print("Scikit-learn's gini decision tree:")
     print(classification_report(iris.target,
                                 sk_gini_tree.predict(iris.data)))
 
-    sk_entropy_tree = DecisionTreeClassifier(criterion='entropy')
+    sk_entropy_tree = SKLDTC(criterion='entropy')
 
     sk_entropy_tree.fit(iris.data, iris.target)
 
@@ -130,26 +144,15 @@ if __name__ == "__main__":
     print(classification_report(iris.target,
                                 sk_entropy_tree.predict(iris.data)))
 
-    # Specify split functions
-    def split_function(constraints):
-        return training_set_best_split_function(iris.data, iris.target, constraints, gini)
-
-    def split_function_e(constraints):
-        return training_set_best_split_function(iris.data, iris.target, constraints, entropy)
-
-    # Specify leaf model
-    def leaf_model_factory(constraints):
-        return training_set_leaf_model(iris.data, iris.target, constraints)
-
     # Define trees
-    tree_g = gtm.GeneralTreeClassifier(split_function, leaf_model_factory)
-    tree_e = gtm.GeneralTreeClassifier(split_function_e, leaf_model_factory)
+    tree_g = DecisionTreeClassifier(gini)
+    tree_e = DecisionTreeClassifier(entropy)
 
     # Build trees
-    tree_g.build()
+    tree_g.fit(iris.data, iris.target)
     logger.debug(tree_g)
 
-    tree_e.build()
+    tree_e.fit(iris.data, iris.target)
     logger.debug(tree_e)
 
     # Report tree quality
