@@ -19,19 +19,10 @@
 
 from generalizedtrees import core
 from scipy.stats import mode
-from typing import Tuple
 import logging
 from generalizedtrees.scores import gini, entropy
 
 logger = logging.getLogger(__name__)
-
-
-def select(x, y, constraints: Tuple):
-    tuples = [(x_i, y_i) for (x_i, y_i) in zip(x, y) if all([c.test(x_i) for c in constraints])]
-    if tuples:
-        return zip(*tuples)
-    else:
-        return [], []
 
 
 class DecisionTreeClassifier(core.GeneralTreeClassifier):
@@ -44,25 +35,27 @@ class DecisionTreeClassifier(core.GeneralTreeClassifier):
         super().__init__()
 
     def best_split(self, constraints):
-        parent_x, parent_y = select(self.features, self.targets, constraints)
-        best_score = self.score(parent_y)
+        index = list(map(core.test_all_x(constraints), self.features))
+        features = self.features[index]
+        targets = self.targets[index]
+
+        best_score = self.score(targets)
 
         best_split = []
 
-        for x_i in parent_x:
+        for x_i in features:
             for feature in range(len(x_i)):
                 left_constraint = core.LEQConstraint(feature, x_i[feature])
                 right_constraint = ~left_constraint
 
-                _, left_y = select(parent_x, parent_y, (left_constraint,))
+                left = list(map(left_constraint.test, features))
+                right = list(map(right_constraint.test, features))
 
-                left_score = self.score(left_y)
+                left_score = self.score(targets[left])
 
-                left_weight = len(left_y) / len(parent_y)
+                left_weight = sum(left) / len(targets)
 
-                _, right_y = select(parent_x, parent_y, (right_constraint,))
-
-                right_score = self.score(right_y)
+                right_score = self.score(targets[right])
 
                 candidate_score = left_score * left_weight + right_score * (1 - left_weight)
 
@@ -75,8 +68,8 @@ class DecisionTreeClassifier(core.GeneralTreeClassifier):
         return best_split
 
     def leaf_predictor(self, constraints):
-        _, y_subset = select(self.features, self.targets, constraints)
-        the_mode, _ = mode(y_subset)
+        index = list(map(core.test_all_x(constraints), self.features))
+        the_mode, _ = mode(self.targets[index])
         return core.SimplePredictor(the_mode[0])
 
     def fit(self, features, targets):
