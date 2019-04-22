@@ -25,7 +25,7 @@ from generalizedtrees.scores import gini, entropy
 logger = logging.getLogger(__name__)
 
 
-class DecisionTreeClassifier(core.GeneralTreeClassifier):
+class DecisionTreeClassifier(core.AbstractTreeClassifier):
 
     def __init__(self, score):
         assert callable(score)

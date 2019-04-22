@@ -200,5 +200,5 @@ def test_all_tuples(constraints):
     return lambda pair: test_all_x(constraints)(pair[0])
 
 
-class GeneralTreeClassifier(GeneralTreeEstimator, ClassifierMixin):
+class AbstractTreeClassifier(GeneralTreeEstimator, ClassifierMixin):
     pass

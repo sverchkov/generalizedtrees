@@ -114,7 +114,7 @@ if __name__ == "__main__":
         return gaussian_feature_sampler_leaf_model(iris_mean, iris_cov, classifier, constraints)
 
     # Define tree
-    tree = gtm.GeneralTreeClassifier(split_function, leaf_model_factory)
+    tree = gtm.AbstractTreeClassifier(split_function, leaf_model_factory)
 
     # Build tree
     tree.build()
