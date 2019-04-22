@@ -43,9 +43,9 @@ class MimicTreeClassifier(AbstractTreeClassifier):
         self.features = None
         self.triples = None
         self.classifier = classifier
-        super().__init__(self.loss_split_function, self.leaf_factory)
+        super().__init__()
 
-    def leaf_factory(self, constraints):
+    def leaf_predictor(self, constraints):
         if not self.triples:
             raise UserWarning("Looks like you tried to build the mimic tree without fitting a test set first!")
 
@@ -55,7 +55,7 @@ class MimicTreeClassifier(AbstractTreeClassifier):
         else:
             return SimplePredictor(mode(y_hats)[0])
 
-    def loss_split_function(self, constraints):
+    def best_split(self, constraints):
         index = list(map(test_all_x(constraints), self.features))
         logger.log(5, index)
         features = self.features[index]
