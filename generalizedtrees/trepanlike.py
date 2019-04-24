@@ -46,6 +46,29 @@ class TrepanLike(AbstractTreeClassifier):
 
         return data, self.classifier.predict(data)
 
+    def best_split(self, constraints):
+        features, targets = self.oracle_sample(constraints)
+
+        best_score = self.score(targets)
+
+        best_split = []
+
+        for x_i in features:
+            for feature in range(len(x_i)):
+                branches = [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
+
+                scores = [self.score(self.oracle_sample(constraints+(branch,))[0]) for branch in branches]
+
+                candidate_score = sum(scores)/len(branches)
+
+                if candidate_score < best_score:
+                    best_score = candidate_score
+                    best_split = branches
+
+        logger.log(5, best_split)
+
+        return best_split
+
     def leaf_predictor(self, constraints):
         _, targets = self.oracle_sample(constraints)
         return SimplePredictor(mode(targets)[0])
