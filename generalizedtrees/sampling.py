@@ -56,6 +56,6 @@ _vectorized_gaussian_rejection_sample = np.vectorize(
 
 def gaussian_rejection_sample(mu, sigma, n, constraints):
 
-    upper, lower, upper_eq, lower_eq = vectorize_constraints(constraints)
+    upper, lower, upper_eq, lower_eq = vectorize_constraints(constraints, len(mu))
 
     return np.column_stack(_vectorized_gaussian_rejection_sample(mu, sigma, n, upper, lower, upper_eq, lower_eq))

@@ -18,18 +18,23 @@
 
 import logging
 from generalizedtrees.core import AbstractTreeClassifier, SimplePredictor
+from generalizedtrees.constraints import LEQConstraint, GTConstraint
+from generalizedtrees.sampling import gaussian_rejection_sample
+from generalizedtrees.scores import gini
 from scipy.stats import mode
+import numpy as np
 
 logger = logging.getLogger()
 
 
 class TrepanLike(AbstractTreeClassifier):
 
-    def __init__(self, classifier, s_min=10):
-        self.data = None
-        self.targets = None
+    def __init__(self, classifier, s_min=10, score=gini):
+        self.feature_means = None
+        self.feature_sigmas = None
         self.classifier = classifier
         self.s_min = s_min
+        self.score = score
         super().__init__()
 
     def oracle_sample(self, constraints, n=None):
@@ -37,12 +42,7 @@ class TrepanLike(AbstractTreeClassifier):
         if n is None:
             n = self.s_min
 
-        data = None
-
-        constraints_dict = {}  # constraints_by_feature(constraints)
-
-        for feature, cs in constraints_dict.items():
-            pass  # Sample feature subject to constraints
+        data = gaussian_rejection_sample(self.feature_means, self.feature_sigmas, n, constraints)
 
         return data, self.classifier.predict(data)
 
@@ -57,7 +57,7 @@ class TrepanLike(AbstractTreeClassifier):
             for feature in range(len(x_i)):
                 branches = [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
 
-                scores = [self.score(self.oracle_sample(constraints+(branch,))[0]) for branch in branches]
+                scores = [self.score(self.oracle_sample(constraints+(branch,))[1]) for branch in branches]
 
                 candidate_score = sum(scores)/len(branches)
 
@@ -74,8 +74,8 @@ class TrepanLike(AbstractTreeClassifier):
         return SimplePredictor(mode(targets)[0])
 
     def fit(self, data, targets):
-        self.data = data
-        self.targets = targets
+        self.feature_means = np.mean(data, axis=0)
+        self.feature_sigmas = np.std(data, axis=0)
         self.build()
 
 
