@@ -16,7 +16,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import generalizedtrees.constraints
 from generalizedtrees import core
 from scipy.stats import mode
 import logging
@@ -45,7 +45,7 @@ class DecisionTreeClassifier(core.AbstractTreeClassifier):
 
         for x_i in features:
             for feature in range(len(x_i)):
-                left_constraint = core.LEQConstraint(feature, x_i[feature])
+                left_constraint = generalizedtrees.constraints.LEQConstraint(feature, x_i[feature])
                 right_constraint = ~left_constraint
 
                 left = list(map(left_constraint.test, features))

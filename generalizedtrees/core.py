@@ -31,38 +31,6 @@ class Constraint(ABC):
         pass
 
 
-class LEQConstraint(Constraint):
-
-    def __init__(self, feature_index, value):
-        self.feature_index = feature_index
-        self.value = value
-
-    def test(self, sample):
-        return sample[self.feature_index] <= self.value
-
-    def __invert__(self):
-        return GTConstraint(self.feature_index, self.value)
-
-    def __repr__(self):
-        return f"[{self.feature_index}]<={self.value}"
-
-
-class GTConstraint(Constraint):
-
-    def __init__(self, feature_index, value):
-        self.feature_index = feature_index
-        self.value = value
-
-    def test(self, sample):
-        return sample[self.feature_index] > self.value
-
-    def __invert__(self):
-        return LEQConstraint(self.feature_index, self.value)
-
-    def __repr__(self):
-        return f"[{self.feature_index}]>{self.value}"
-
-
 class SimplePredictor:
 
     def __init__(self, prediction):
