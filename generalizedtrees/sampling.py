@@ -59,3 +59,52 @@ def gaussian_rejection_sample(mu, sigma, n, constraints):
     upper, lower, upper_eq, lower_eq = vectorize_constraints(constraints, len(mu))
 
     return np.column_stack(_vectorized_gaussian_rejection_sample(mu, sigma, n, upper, lower, upper_eq, lower_eq))
+
+
+def agnostic_univariate_sample(n: int = 1, lower: float = -np.inf, upper: float = np.inf, scale: float = 1):
+    """
+    Sample a single feature agnostically:
+    - from standard Cauchy (0 mode) if unconstrained
+    - from abs(Cauchy) if bounded on one side
+    - from uniform if bounded on both sides
+    :param n: Number of samples
+    :param lower: Lowerbound (-inf for unbounded)
+    :param upper: Upperbound (inf for unbounded)
+    :param scale: Scale parameter for unbounded distributions
+    :return:
+    """
+
+    unbounded_above = np.isinf(upper)
+    unbounded_below = np.isinf(lower)
+
+    if unbounded_above or unbounded_below:
+        r = np.random.standard_cauchy(n)*scale  # Unbounded means we'll use the Cauchy somehow
+        if not unbounded_below:
+            return lower + abs(r)
+        elif not unbounded_above:
+            return upper - abs(r)
+        else:
+            return r
+    else:
+        return np.random.uniform(lower, upper, n)
+
+
+_vectorized_agnostic_sample = np.vectorize(
+    agnostic_univariate_sample,
+    otypes=[np.ndarray],
+    excluded='n')
+
+
+def agnostic_numeric_sample(n, dim, constraints):
+    """
+    Samples a fully numeric feature matrix that satisfies the constraints.
+    Sampling strategy is described in :func:`agnostic_univariate_sample`
+    :param n: Number of samples
+    :param dim: Number of features
+    :param constraints: Iterable over Constraints
+    :return: n x dim feature matrix that satisfies the constraints
+    """
+
+    upper, lower, _, _ = vectorize_constraints(constraints, dim)
+
+    return np.column_stack(_vectorized_agnostic_sample(n, lower, upper))
