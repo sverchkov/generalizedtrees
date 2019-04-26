@@ -31,18 +31,6 @@ class Constraint(ABC):
         pass
 
 
-class SimplePredictor:
-
-    def __init__(self, prediction):
-        self.prediction = prediction
-
-    def predict(self, sample):
-        return self.prediction
-
-    def __repr__(self):
-        return f'Predict: {self.prediction}'
-
-
 class Node:
 
     def __init__(self, constraint: Constraint = None, parent: Node = None):

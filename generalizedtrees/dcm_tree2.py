@@ -15,7 +15,8 @@
 # limitations under the License.
 
 import logging
-from generalizedtrees.core import AbstractTreeClassifier, SimplePredictor, test_all_x
+from generalizedtrees.core import AbstractTreeClassifier, test_all_x
+from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.constraints import LEQConstraint
 from scipy.stats import mode
 from numpy import array, inf, transpose, ndarray

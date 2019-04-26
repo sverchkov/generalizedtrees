@@ -17,6 +17,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import generalizedtrees.constraints
+import generalizedtrees.leaves
 from generalizedtrees import core
 from scipy.stats import mode
 import logging
@@ -70,7 +71,7 @@ class DecisionTreeClassifier(core.AbstractTreeClassifier):
     def leaf_predictor(self, constraints):
         index = list(map(core.test_all_x(constraints), self.features))
         the_mode, _ = mode(self.targets[index])
-        return core.SimplePredictor(the_mode[0])
+        return generalizedtrees.leaves.SimplePredictor(the_mode[0])
 
     def fit(self, features, targets):
         self.features = features
