@@ -33,7 +33,7 @@ class ClassificationPredictor:
         self._classifier = classifier
 
     def predict(self, sample):
-        return self._classifier.predict(sample)
+        return self._classifier.predict(sample.reshape((1, -1)))[0]
 
     def __repr__(self):
         return f'Predict: {self._classifier}'

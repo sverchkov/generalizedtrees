@@ -17,10 +17,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import generalizedtrees.constraints
-import generalizedtrees.leaves
+from generalizedtrees.leaves import SimplePredictor, ClassificationPredictor
 from generalizedtrees import core
 from scipy.stats import mode
 from sklearn.base import clone
+from numpy import unique
 import logging
 from generalizedtrees.scores import gini, entropy
 
@@ -72,7 +73,7 @@ class DecisionTreeClassifier(core.AbstractTreeClassifier):
     def leaf_predictor(self, constraints):
         index = list(map(core.test_all_x(constraints), self.features))
         the_mode, _ = mode(self.targets[index])
-        return generalizedtrees.leaves.SimplePredictor(the_mode[0])
+        return SimplePredictor(the_mode[0])
 
     def fit(self, features, targets):
         self.features = features
@@ -82,52 +83,61 @@ class DecisionTreeClassifier(core.AbstractTreeClassifier):
 
 class ModelTree(core.AbstractTreeClassifier):
 
-    def __init__(self, score, weak_model):
+    def __init__(self, score, weak_model, max_depth=5):
         assert callable(score)
         self.score = score
         self.weak_model = weak_model
         self.features = None
         self.targets = None
+        self.max_depth = max_depth
         super().__init__()
 
     def best_split(self, constraints):
-        index = list(map(core.test_all_x(constraints), self.features))
-        features = self.features[index]
-        targets = self.targets[index]
-
-        best_score = self.score(targets)
 
         best_split = []
 
-        for x_i in features:
-            for feature in range(len(x_i)):
-                left_constraint = generalizedtrees.constraints.LEQConstraint(feature, x_i[feature])
-                right_constraint = ~left_constraint
+        if len(constraints) <= self.max_depth:  # Using the fact that the constraint list length is the depth
 
-                left = list(map(left_constraint.test, features))
-                right = list(map(right_constraint.test, features))
+            index = list(map(core.test_all_x(constraints), self.features))
+            features = self.features[index]
+            targets = self.targets[index]
 
-                left_score = self.score(targets[left])
+            best_score = self.score(targets)
 
-                left_weight = sum(left) / len(targets)
+            for x_i in features:
+                for feature in range(len(x_i)):
+                    left_constraint = generalizedtrees.constraints.LEQConstraint(feature, x_i[feature])
+                    right_constraint = ~left_constraint
 
-                right_score = self.score(targets[right])
+                    left = list(map(left_constraint.test, features))
+                    right = list(map(right_constraint.test, features))
 
-                candidate_score = left_score * left_weight + right_score * (1 - left_weight)
+                    if sum(left) > 0 and sum(right) > 0:
 
-                if candidate_score < best_score:
-                    best_score = candidate_score
-                    best_split = [left_constraint, right_constraint]
+                        left_score = self.score(targets[left])
 
-        logger.log(5, best_split)
+                        left_weight = sum(left) / len(targets)
+
+                        right_score = self.score(targets[right])
+
+                        candidate_score = left_score * left_weight + right_score * (1 - left_weight)
+
+                        if candidate_score < best_score:
+                            best_score = candidate_score
+                            best_split = [left_constraint, right_constraint]
 
         return best_split
 
     def leaf_predictor(self, constraints):
         index = list(map(core.test_all_x(constraints), self.features))
+
+        unique_targets = unique(self.targets[index])
+        if len(unique_targets) == 1:
+            return SimplePredictor(unique_targets[0])
+
         model = clone(self.weak_model)
         model.fit(self.features[index], self.targets[index])
-        return model
+        return ClassificationPredictor(model)
 
     def fit(self, features, targets):
         self.features = features
@@ -141,6 +151,7 @@ if __name__ == "__main__":
     from sklearn.svm import SVC
     from sklearn.tree import DecisionTreeClassifier as SKLDTC
     from sklearn.metrics import classification_report
+    from sklearn.linear_model import LogisticRegression
 
     logging.basicConfig(level=5)
 
@@ -182,7 +193,20 @@ if __name__ == "__main__":
     logger.debug(tree_e)
 
     # Report tree quality
+    print("Our gini decision tree:")
     print(classification_report(iris.target,
                                 tree_g.predict(iris.data)))
+
+    print("Our entropy decision tree:")
     print(classification_report(iris.target,
                                 tree_e.predict(iris.data)))
+
+    logger.info("Learning logistic model tree:")
+    model_tree = ModelTree(score=gini, weak_model=LogisticRegression(), max_depth=1)
+    model_tree.fit(iris.data, iris.target)
+
+    print("Our model tree:")
+    predictions = model_tree.predict(iris.data)
+    logger.debug(predictions)
+    print(classification_report(iris.target,
+                                predictions))
