@@ -20,7 +20,7 @@ class SimplePredictor:
     def __init__(self, prediction):
         self.prediction = prediction
 
-    def predict(self, sample):
+    def predict_one(self, sample):
         return self.prediction
 
     def __repr__(self):
@@ -32,8 +32,8 @@ class ClassificationPredictor:
     def __init__(self, classifier):
         self._classifier = classifier
 
-    def predict(self, sample):
-        return self._classifier.predict(sample.reshape((1, -1)))[0]
+    def predict_one(self, sample):
+        return self._classifier.predict_one(sample.reshape((1, -1)))[0]
 
     def __repr__(self):
         return f'Predict: {self._classifier}'

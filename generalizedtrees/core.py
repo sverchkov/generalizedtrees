@@ -19,6 +19,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 from collections import deque
+from numpy import ndarray
 import logging
 
 logger = logging.getLogger(__name__)
@@ -58,11 +59,14 @@ class ChildSelector:
     def __init__(self, children: List[Node]):
         self.children = children
 
-    def predict(self, sample):
+    def predict_one(self, sample):
         for c in self.children:  # Child constraints should be mutex so we return the first satisfying one
             if c.constraint.test(sample):
-                return c.model.predict(sample)
+                return c.model.predict_one(sample)
         return None  # Maybe throw exception here?
+
+    def predict(self, data: ndarray):
+        assert data.ndim == 2  # Data matrix must be 2D
 
     def __repr__(self):
         return self.children.__repr__()
@@ -142,7 +146,7 @@ class GeneralTreeEstimator(BaseEstimator, ABC):
         return [self.predict_instance(x) for x in data]
 
     def predict_instance(self, sample):
-        return self.root.model.predict(sample)
+        return self.root.model.predict_one(sample)
 
     def __repr__(self):
         return f"Tree: {self.root}"
