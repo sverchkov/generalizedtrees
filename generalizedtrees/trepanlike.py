@@ -30,11 +30,12 @@ logger = logging.getLogger()
 
 class TrepanLike(AbstractTreeClassifier):
 
-    def __init__(self, classifier, s_min=20, score=gini):
+    def __init__(self, classifier, s_min=20, max_depth=5, score=gini):
         self.feature_means = None
         self.feature_sigmas = None
         self.classifier = classifier
         self.s_min = s_min
+        self.max_depth = max_depth
         self.score = score
         super().__init__()
 
@@ -48,25 +49,26 @@ class TrepanLike(AbstractTreeClassifier):
         return data, self.classifier.predict(data)
 
     def best_split(self, constraints):
-        features, targets = self.oracle_sample(constraints)
-
-        best_score = self.score(targets)
 
         best_split = []
 
-        for x_i in features:
-            for feature in range(len(x_i)):
-                branches = [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
+        if len(constraints) < self.max_depth:
 
-                scores = [self.score(self.oracle_sample(constraints+(branch,))[1]) for branch in branches]
+            features, targets = self.oracle_sample(constraints)
 
-                candidate_score = sum(scores)/len(branches)
+            best_score = self.score(targets)
 
-                if candidate_score < best_score:
-                    best_score = candidate_score
-                    best_split = branches
+            for x_i in features:
+                for feature in range(len(x_i)):
+                    branches = [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
 
-        logger.log(5, best_split)
+                    scores = [self.score(self.oracle_sample(constraints+(branch,))[1]) for branch in branches]
+
+                    candidate_score = sum(scores)/len(branches)
+
+                    if candidate_score < best_score:
+                        best_score = candidate_score
+                        best_split = branches
 
         return best_split
 
