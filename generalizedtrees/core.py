@@ -19,7 +19,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 from collections import deque
-from numpy import ndarray
+from numpy import ndarray, empty, apply_along_axis
 import logging
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,14 @@ class ChildSelector:
         return None  # Maybe throw exception here?
 
     def predict(self, data: ndarray):
-        assert data.ndim == 2  # Data matrix must be 2D
+        assert data.ndim == 2, "Data matrix must be 2D"
+        prediction = empty(data.shape[0])
+
+        for c in self.children:
+            indexes = apply_along_axis(c.constraint.test, 1, data)
+            prediction[indexes] = c.model.predict(data[indexes])
+
+        return prediction
 
     def __repr__(self):
         return self.children.__repr__()
