@@ -16,8 +16,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import generalizedtrees.constraints
-from generalizedtrees.leaves import SimplePredictor, ClassificationPredictor
+from generalizedtrees.leaves import SimplePredictor
+from generalizedtrees.constraints import GTConstraint, LEQConstraint
 from generalizedtrees import core
 from scipy.stats import mode
 from sklearn.base import clone
@@ -48,7 +48,7 @@ class DecisionTreeClassifier(core.AbstractTreeClassifier):
 
         for x_i in features:
             for feature in range(len(x_i)):
-                left_constraint = generalizedtrees.constraints.LEQConstraint(feature, x_i[feature])
+                left_constraint = LEQConstraint(feature, x_i[feature])
                 right_constraint = ~left_constraint
 
                 left = list(map(left_constraint.test, features))
@@ -106,38 +106,37 @@ class ModelTree(core.AbstractTreeClassifier):
 
             for x_i in features:
                 for feature in range(len(x_i)):
-                    left_constraint = generalizedtrees.constraints.LEQConstraint(feature, x_i[feature])
-                    right_constraint = ~left_constraint
 
-                    left = list(map(left_constraint.test, features))
-                    right = list(map(right_constraint.test, features))
+                    candidate_split = [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
 
-                    if sum(left) > 0 and sum(right) > 0:
+                    candidate_score = self._score_split(candidate_split, features, targets)
 
-                        left_score = self.score(targets[left])
-
-                        left_weight = sum(left) / len(targets)
-
-                        right_score = self.score(targets[right])
-
-                        candidate_score = left_score * left_weight + right_score * (1 - left_weight)
-
-                        if candidate_score < best_score:
-                            best_score = candidate_score
-                            best_split = [left_constraint, right_constraint]
+                    if candidate_score < best_score:
+                        best_score = candidate_score
+                        best_split = candidate_split
 
         return best_split
 
-    def leaf_predictor(self, constraints):
-        index = list(map(core.test_all_x(constraints), self.features))
+    def _score_split(self, candidate_split, features, targets):
+        score = 0
+        for constraint in candidate_split:
+            index = list(map(constraint.test, features))
+            score += self.score(self._train_leaf_predictor(features[index], targets).predict(targets))  # Overfitting?
 
-        unique_targets = unique(self.targets[index])
+    def _train_leaf_predictor(self, features, targets):
+        unique_targets = unique(targets)
+
         if len(unique_targets) == 1:
             return SimplePredictor(unique_targets[0])
 
         model = clone(self.weak_model)
-        model.fit(self.features[index], self.targets[index])
-        return ClassificationPredictor(model)
+        model.fit(features, targets)
+        return model
+
+    def leaf_predictor(self, constraints):
+        index = list(map(core.test_all_x(constraints), self.features))
+
+        return self._train_leaf_predictor(self.features[index], self.targets[index])
 
     def fit(self, features, targets):
         self.features = features

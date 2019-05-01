@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from numpy import ndarray, full
+
 
 class SimplePredictor:
 
@@ -22,6 +24,10 @@ class SimplePredictor:
 
     def predict_one(self, sample):
         return self.prediction
+
+    def predict(self, data: ndarray):
+        assert data.ndim == 2
+        return full(data.shape[0], self.prediction)
 
     def __repr__(self):
         return f'Predict: {self.prediction}'

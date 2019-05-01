@@ -149,8 +149,8 @@ class GeneralTreeEstimator(BaseEstimator, ABC):
             else:  # It's a leaf
                 parent.model = self.leaf_predictor_of_node(parent)
 
-    def predict(self, data):
-        return [self.predict_instance(x) for x in data]
+    def predict(self, data: ndarray):
+        return self.root.model.predict(data)
 
     def predict_instance(self, sample):
         return self.root.model.predict_one(sample)
