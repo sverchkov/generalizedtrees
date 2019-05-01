@@ -63,7 +63,7 @@ class MimicTreeClassifier(AbstractTreeClassifier):
         features = self.features[index]
         y = self.y[index]
 
-        shuffle_hat = self.classifier.predict_one(shuffle_features(features))
+        shuffle_hat = self.classifier.predict(shuffle_features(features))
 
         best_split = []
         best_score = loss_score(shuffle_hat, y)
@@ -79,8 +79,8 @@ class MimicTreeClassifier(AbstractTreeClassifier):
                 if not any(left) or not any(right):
                     continue
 
-                left_hat = self.classifier.predict_one(shuffle_features(features[left]))
-                right_hat = self.classifier.predict_one(shuffle_features(features[right]))
+                left_hat = self.classifier.predict(shuffle_features(features[left]))
+                right_hat = self.classifier.predict(shuffle_features(features[right]))
 
                 candidate_score = loss_score(left_hat, y[left]) + loss_score(right_hat, y[right])
 
@@ -95,7 +95,7 @@ class MimicTreeClassifier(AbstractTreeClassifier):
     def fit(self, features, target):
         self.features = features
         self.y = target
-        self.y_hat = self.classifier.predict_one(features)
+        self.y_hat = self.classifier.predict(features)
         self.triples = zip(features, self.y_hat, target)
         self.build()
 
