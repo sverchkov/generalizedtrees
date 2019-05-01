@@ -59,12 +59,6 @@ class ChildSelector:
     def __init__(self, children: List[Node]):
         self.children = children
 
-    def predict_one(self, sample):
-        for c in self.children:  # Child constraints should be mutex so we return the first satisfying one
-            if c.constraint.test(sample):
-                return c.model.predict_one(sample)
-        return None  # Maybe throw exception here?
-
     def predict(self, data: ndarray):
         assert data.ndim == 2, "Data matrix must be 2D"
         n = data.shape[0]
@@ -156,7 +150,7 @@ class GeneralTreeEstimator(BaseEstimator, ABC):
         return self.root.model.predict(data)
 
     def predict_instance(self, sample):
-        return self.root.model.predict_one(sample)
+        return self.root.model.predict(sample.reshape((1, -1)))[0]
 
     def __repr__(self):
         return f"Tree: {self.root}"

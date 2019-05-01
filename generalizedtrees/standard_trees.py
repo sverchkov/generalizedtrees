@@ -21,7 +21,7 @@ from generalizedtrees.constraints import GTConstraint, LEQConstraint
 from generalizedtrees import core
 from scipy.stats import mode
 from sklearn.base import clone
-from numpy import unique
+from numpy import unique, inf
 import logging
 from generalizedtrees.scores import gini, entropy
 
@@ -83,14 +83,17 @@ class DecisionTreeClassifier(core.AbstractTreeClassifier):
 
 class ModelTree(core.AbstractTreeClassifier):
 
-    def __init__(self, score, weak_model, max_depth=5):
-        assert callable(score)
-        self.score = score
+    def __init__(self, weak_model, max_depth=5):
         self.weak_model = weak_model
         self.features = None
         self.targets = None
         self.max_depth = max_depth
         super().__init__()
+
+    def _training_loss(self, data, targets):
+
+        y_hat = self._train_leaf_predictor(data, targets).predict(data)
+        return sum((targets - y_hat)**2)
 
     def best_split(self, constraints):
 
@@ -102,7 +105,7 @@ class ModelTree(core.AbstractTreeClassifier):
             features = self.features[index]
             targets = self.targets[index]
 
-            best_score = self.score(targets)
+            best_score = self._training_loss(features, targets)
 
             for x_i in features:
                 for feature in range(len(x_i)):
@@ -121,7 +124,10 @@ class ModelTree(core.AbstractTreeClassifier):
         score = 0
         for constraint in candidate_split:
             index = list(map(constraint.test, features))
-            score += self.score(self._train_leaf_predictor(features[index], targets).predict(targets))  # Overfitting?
+            if sum(index) < 1:
+                return inf
+            score += self._training_loss(features[index], targets[index])  # Overfitting?
+        return score
 
     def _train_leaf_predictor(self, features, targets):
         unique_targets = unique(targets)
@@ -201,7 +207,7 @@ if __name__ == "__main__":
                                 tree_e.predict(iris.data)))
 
     logger.info("Learning logistic model tree:")
-    model_tree = ModelTree(score=gini, weak_model=LogisticRegression(), max_depth=1)
+    model_tree = ModelTree(weak_model=LogisticRegression(), max_depth=1)
     model_tree.fit(iris.data, iris.target)
 
     print("Our model tree:")
