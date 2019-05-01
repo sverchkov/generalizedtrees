@@ -60,4 +60,4 @@ def eval_mimic_on_iris(mimic_tree_class):
         print("Mimic tree:")
         print(tree)
         print(classification_report(y[test_index],
-                                    tree.predict_one(data[test_index])))
+                                    tree.predict(data[test_index])))

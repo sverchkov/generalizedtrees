@@ -46,7 +46,7 @@ class TrepanLike(AbstractTreeClassifier):
 
         data = gaussian_rejection_sample(self.feature_means, self.feature_sigmas, n, constraints)
 
-        return data, self.classifier.predict_one(data)
+        return data, self.classifier.predict(data)
 
     def best_split(self, constraints):
 

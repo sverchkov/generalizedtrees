@@ -67,11 +67,14 @@ class ChildSelector:
 
     def predict(self, data: ndarray):
         assert data.ndim == 2, "Data matrix must be 2D"
-        prediction = empty(data.shape[0])
+        n = data.shape[0]
+        prediction = empty(n)
 
-        for c in self.children:
-            indexes = apply_along_axis(c.constraint.test, 1, data)
-            prediction[indexes] = c.model.predict(data[indexes])
+        if n > 0:
+
+            for c in self.children:
+                indexes = apply_along_axis(c.constraint.test, 1, data)
+                prediction[indexes] = c.model.predict(data[indexes])
 
         return prediction
 
