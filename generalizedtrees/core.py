@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
+
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 from collections import deque
@@ -33,7 +33,7 @@ class Constraint(ABC):
 
 class Node:
 
-    def __init__(self, constraint: Constraint = None, parent: Node = None):
+    def __init__(self, constraint: Constraint = None, parent: "Node" = None):
         self.parent = parent
         self.constraint = constraint
         self.model = None
