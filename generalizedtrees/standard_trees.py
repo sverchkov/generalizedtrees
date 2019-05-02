@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 class DecisionTreeClassifier(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
 
-    def __init__(self, score):
+    def __init__(self, score=gini):
         assert callable(score)
         self.score = score
         self.features = None
