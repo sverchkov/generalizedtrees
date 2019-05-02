@@ -15,7 +15,8 @@
 # limitations under the License.
 
 import logging
-from generalizedtrees.core import AbstractTreeClassifier, test_all_x
+from sklearn.base import BaseEstimator, ClassifierMixin
+from generalizedtrees.core import AbstractTreeEstimator, test_all_x
 from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.constraints import LEQConstraint
 from scipy.stats import mode
@@ -37,7 +38,7 @@ def shuffle_features(x: ndarray):
     return transpose(permutation(transpose(x)))
 
 
-class MimicTreeClassifier(AbstractTreeClassifier):
+class MimicTreeClassifier(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
 
     def __init__(self, classifier):
         self.y = None

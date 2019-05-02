@@ -22,7 +22,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="generalizedtrees",
-    version="0.0.1",
+    version="0.0.2",
     author="Yuriy Sverchkov",
     author_email="yuriy.sverchkov@wisc.edu",
     description="Library for tree models: decision trees, model trees, mimic models, etc.",

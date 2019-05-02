@@ -17,7 +17,8 @@
 # limitations under the License.
 
 import logging
-from generalizedtrees.core import AbstractTreeClassifier
+from sklearn.base import BaseEstimator, ClassifierMixin
+from generalizedtrees.core import AbstractTreeEstimator
 from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.constraints import LEQConstraint, GTConstraint
 from generalizedtrees.sampling import gaussian_rejection_sample
@@ -28,7 +29,7 @@ import numpy as np
 logger = logging.getLogger()
 
 
-class TrepanLike(AbstractTreeClassifier):
+class TrepanLike(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
 
     def __init__(self, classifier, s_min=20, max_depth=5, score=gini):
         self.feature_means = None

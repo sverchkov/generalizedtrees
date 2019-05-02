@@ -15,7 +15,6 @@
 # limitations under the License.
 
 from __future__ import annotations
-from sklearn.base import BaseEstimator, ClassifierMixin
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 from collections import deque
@@ -94,13 +93,13 @@ class NodeQueue:
         return len(self.q)
 
 
-class GeneralTreeEstimator(BaseEstimator, ABC):
+class AbstractTreeEstimator(ABC):
 
     def __init__(
             self,
             sequential_access_data_structure_factory=NodeQueue):
         """
-        The general tree classifier is defined by
+        The abstract tree classifier is defined by
         :param sequential_access_data_structure_factory: A  factory that produces a data structure such as a stack,
         queue, or priority queue that determines the order in which the tree is built. For a priority queue the rule for
         comparing nodes is also communicated through this function. The data structure must implement append (for one
@@ -149,7 +148,7 @@ class GeneralTreeEstimator(BaseEstimator, ABC):
     def predict(self, data: ndarray):
         return self.root.model.predict(data)
 
-    def predict_instance(self, sample):
+    def predict_instance(self, sample):  # May be deprecated later on
         return self.root.model.predict(sample.reshape((1, -1)))[0]
 
     def __repr__(self):
@@ -162,7 +161,3 @@ def test_all_x(constraints):
 
 def test_all_tuples(constraints):
     return lambda pair: test_all_x(constraints)(pair[0])
-
-
-class AbstractTreeClassifier(GeneralTreeEstimator, ClassifierMixin):
-    pass

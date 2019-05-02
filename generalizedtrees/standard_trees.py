@@ -16,6 +16,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from sklearn.base import BaseEstimator, ClassifierMixin
+from generalizedtrees.core import AbstractTreeEstimator
 from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.constraints import GTConstraint, LEQConstraint
 from generalizedtrees import core
@@ -28,7 +30,7 @@ from generalizedtrees.scores import gini, entropy
 logger = logging.getLogger(__name__)
 
 
-class DecisionTreeClassifier(core.AbstractTreeClassifier):
+class DecisionTreeClassifier(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
 
     def __init__(self, score):
         assert callable(score)
@@ -81,7 +83,7 @@ class DecisionTreeClassifier(core.AbstractTreeClassifier):
         self.build()
 
 
-class ModelTree(core.AbstractTreeClassifier):
+class ModelTree(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
 
     def __init__(self, weak_model, max_depth=5):
         self.weak_model = weak_model
