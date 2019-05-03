@@ -23,7 +23,9 @@ from generalizedtrees.constraints import GTConstraint, LEQConstraint
 from generalizedtrees import core
 from scipy.stats import mode
 from sklearn.base import clone
-from numpy import unique, inf
+from sklearn.utils.validation import check_X_y, check_array
+from sklearn.utils.multiclass import check_classification_targets
+from numpy import unique, inf, ndarray
 import logging
 from generalizedtrees.scores import gini, entropy
 
@@ -32,19 +34,24 @@ logger = logging.getLogger(__name__)
 
 class DecisionTreeClassifier(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
 
-    def __init__(self, score=gini):
-        assert callable(score)
-        self.score = score
-        self.features = None
-        self.targets = None
+    # This is how we end up declaring tags
+    def _get_tags(self):
+        return {"allow_nan": True}
+
+    def __init__(self, split_score=gini, enforce_finite=True):
+        assert callable(split_score)
+        self.split_score = split_score
+        self.enforce_finite = enforce_finite
+        self.data_: ndarray
+        self.targets_: ndarray
         super().__init__()
 
     def best_split(self, constraints):
-        index = list(map(core.test_all_x(constraints), self.features))
-        features = self.features[index]
-        targets = self.targets[index]
+        index = list(map(core.test_all_x(constraints), self.data_))
+        features = self.data_[index]
+        targets = self.targets_[index]
 
-        best_score = self.score(targets)
+        best_score = self.split_score(targets)
 
         best_split = []
 
@@ -56,11 +63,11 @@ class DecisionTreeClassifier(BaseEstimator, ClassifierMixin, AbstractTreeEstimat
                 left = list(map(left_constraint.test, features))
                 right = list(map(right_constraint.test, features))
 
-                left_score = self.score(targets[left])
+                left_score = self.split_score(targets[left])
 
                 left_weight = sum(left) / len(targets)
 
-                right_score = self.score(targets[right])
+                right_score = self.split_score(targets[right])
 
                 candidate_score = left_score * left_weight + right_score * (1 - left_weight)
 
@@ -73,14 +80,28 @@ class DecisionTreeClassifier(BaseEstimator, ClassifierMixin, AbstractTreeEstimat
         return best_split
 
     def leaf_predictor(self, constraints):
-        index = list(map(core.test_all_x(constraints), self.features))
-        the_mode, _ = mode(self.targets[index])
+        index = list(map(core.test_all_x(constraints), self.data_))
+        the_mode, _ = mode(self.targets_[index])
         return SimplePredictor(the_mode[0])
 
-    def fit(self, features, targets):
-        self.features = features
-        self.targets = targets
+    def fit(self, data: ndarray, y: ndarray):
+
+        self.data_, self.targets_ = check_X_y(data, y)
+        check_classification_targets(self.targets_)
+
+        self.classes_ = unique(self.targets_)
+        self.m_ = self.data_.shape[1]
+
         self.build()
+
+        return self
+
+    def check_data_for_predict(self, data):
+        checked_data = check_array(data, force_all_finite=self.enforce_finite, estimator=self)
+        if checked_data.shape[1] != self.m_:
+            raise ValueError((f"The number of features in predict ({checked_data.shape[1]})"
+                              f" is different from the number of features in fit ({self.m_})."))
+        return checked_data
 
 
 class ModelTree(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
@@ -150,6 +171,7 @@ class ModelTree(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
         self.features = features
         self.targets = targets
         self.build()
+        return self
 
 
 if __name__ == "__main__":

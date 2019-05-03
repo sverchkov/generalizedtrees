@@ -17,13 +17,17 @@
 import numpy as np
 
 
+def frequencies(y):
+    values = np.unique(y)
+    return np.array([sum(y == v) for v in values])
+
 def gini(y):
-    n = len(y)
+    n: int = len(y)
 
     if n == 0:
         return 0
 
-    p = np.bincount(y)/n
+    p = frequencies(y)/n
 
     return 1 - sum(p*p)
 
@@ -34,7 +38,7 @@ def entropy(y):
     if n == 0:
         return 0
 
-    p = np.bincount(y)/n
+    p = frequencies(y)/n
     pl2p = np.where(p > 0, -p*np.log2(p), 0)
 
     return sum(pl2p)

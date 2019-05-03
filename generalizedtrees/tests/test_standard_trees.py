@@ -20,3 +20,12 @@ from sklearn.utils.estimator_checks import check_estimator
 
 def test_decision_tree_with_sklearn():
     check_estimator(DecisionTreeClassifier)
+
+
+if __name__ == "__main__":
+    import logging
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(level=5)
+
+    test_decision_tree_with_sklearn()
+
