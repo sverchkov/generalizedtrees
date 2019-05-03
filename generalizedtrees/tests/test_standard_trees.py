@@ -16,8 +16,10 @@
 
 from generalizedtrees.standard_trees import DecisionTreeClassifier
 from sklearn.utils.estimator_checks import check_estimator
+import pytest
 
 
+@pytest.mark.slow
 def test_decision_tree_with_sklearn():
     check_estimator(DecisionTreeClassifier)
 
