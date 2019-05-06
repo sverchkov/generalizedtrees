@@ -78,6 +78,72 @@ class GTConstraint(SingleFeatureConstraint):
         return f"[{self.feature}]>{self._value}"
 
 
+class EQConstraint(SingleFeatureConstraint):
+
+    def __init__(self, feature_index, value):
+        self._value = value
+        super().__init__(feature_index)
+
+    @property
+    def value(self):
+        return self._value
+
+    def test_value(self, value):
+        return value == self.value
+
+    def __invert__(self):
+        return NEQConstraint(self.feature, self.value)
+
+    def __repr__(self):
+        return f"[{self.feature}]=={self.value}"
+
+
+class NEQConstraint(SingleFeatureConstraint):
+
+    def __init__(self, feature_index, value):
+        self._value = value
+        super().__init__(feature_index)
+
+    @property
+    def value(self):
+        return self._value
+
+    def test_value(self, value):
+        return value != self.value
+
+    def __invert__(self):
+        return EQConstraint(self.feature, self.value)
+
+    def __repr__(self):
+        return f"[{self.feature}]!={self.value}"
+
+
+class NofMConstraint(Constraint):
+
+    def __init__(self, n, constraints):
+        self._constraints = constraints
+        self._n = n
+
+    @property
+    def n_to_satisfy(self):
+        return self._n
+
+    @property
+    def number_of_constraints(self):
+        return len(self._constraints)
+
+    def test(self, sample):
+
+        satisfied: int = 0
+
+        for c in self._constraints:
+            satisfied += c.test(sample)  # Implicitly converting bool to 0/1
+            if satisfied >= self._n:
+                return True
+
+        return False
+
+
 def vectorize_constraints(constraints, dimensions):
     upper = np.full(dimensions, np.inf)
     lower = np.full(dimensions, -np.inf)
