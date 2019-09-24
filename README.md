@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/sverchkov/generalizedtrees.svg?branch=master)](https://travis-ci.com/sverchkov/generalizedtrees)
+[![Build Status](https://travis-ci.com/Craven-Biostat-Lab/generalizedtrees.svg?branch=master)](https://travis-ci.com/Craven-Biostat-Lab/generalizedtrees)
 
 # generalizedtrees
 Library for tree models: decision trees, model trees, mimic models, etc.
@@ -8,7 +8,7 @@ Requires Python 3.6 or greater. See `requirements.txt` for python package depend
 
 ## Development
 
-We use the [GitHub issue tracker](https://github.com/sverchkov/generalizedtrees/issues) for bugs and feature requests.
+We use the [GitHub issue tracker](https://github.com/Craven-Biostat-Lab/generalizedtrees/issues) for bugs and feature requests.
 
 ## License
 Licensed under the Apache License, Version 2.0, Copyright 2019 Yuriy Sverchkov
