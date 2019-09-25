@@ -70,7 +70,7 @@ def rejection_sample_generator(generator):
         sampled = []
 
         while len(sampled) < n:
-            sampled.append([x for x in generator(n-sampled) if tester(x)])
+            sampled.extend([x for x in generator(n-len(sampled)) if tester(x)])
 
         return sampled
 
