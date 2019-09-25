@@ -16,6 +16,7 @@
 import numpy as np
 
 from generalizedtrees.constraints import vectorize_constraints
+from generalizedtrees.core import test_all_x
 
 
 def univariate_gaussian_rejection_sample(
@@ -59,6 +60,21 @@ def gaussian_rejection_sample(mu, sigma, n, constraints):
     upper, lower, upper_eq, lower_eq = vectorize_constraints(constraints, len(mu))
 
     return np.column_stack(_vectorized_gaussian_rejection_sample(mu, sigma, n, upper, lower, upper_eq, lower_eq))
+
+
+def rejection_sample_generator(generator):
+
+    def constrained_generator(n, constraints):
+
+        tester = test_all_x(constraints)
+        sampled = []
+
+        while len(sampled) < n:
+            sampled.append([x for x in generator(n-sampled) if tester(x)])
+
+        return sampled
+
+    return constrained_generator
 
 
 def agnostic_univariate_sample(n: int = 1, lower: float = -np.inf, upper: float = np.inf, scale: float = 1):
