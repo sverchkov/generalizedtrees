@@ -34,10 +34,6 @@ logger = logging.getLogger(__name__)
 
 class DecisionTreeClassifier(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
 
-    # This is how we end up declaring tags
-    def _get_tags(self):
-        return {"allow_nan": True}
-
     def __init__(self, split_score=gini, enforce_finite=True):
         assert callable(split_score)
         self.split_score = split_score
