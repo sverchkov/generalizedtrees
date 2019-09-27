@@ -18,7 +18,8 @@
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 from collections import deque
-from numpy import ndarray, empty, apply_along_axis, array
+from numpy import ndarray, empty, apply_along_axis
+from sklearn.exceptions import NotFittedError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -170,7 +171,7 @@ class AbstractTreeEstimator(ABC):
 
     def predict(self, data: ndarray, enforce_finite=True):
         if not hasattr(self, 'root_'):
-            raise AttributeError("Tried to predict before building tree (usually through fit)")
+            raise NotFittedError("Tried to predict before building tree (usually through fit)")
         result = self.root_.model.predict(self.check_data_for_predict(data))
         logger.log(5, f"Predicting {result} ({type(result)}; {result.dtype})")
         return result
