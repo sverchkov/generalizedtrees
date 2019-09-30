@@ -30,13 +30,19 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache 2",
     keywords="machine learning decision trees model",
-    url="https://github.com/sverchkov/generalizedtrees",
-    packages=find_packages(),
+    url="https://github.com/Craven-Biostat-Lab/generalizedtrees",
+    packages=['generalizedtrees'],
+    install_requires=[
+        'scikit-learn',
+        'numpy',
+        'scipy'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
         "Development Status :: 1 - Planning",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering",
-    ]
+    ],
+    python_requires='>=3.6'
 )
