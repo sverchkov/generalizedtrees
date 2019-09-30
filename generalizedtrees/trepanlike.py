@@ -17,76 +17,73 @@
 # limitations under the License.
 
 import logging
-from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import ClassifierMixin
 from generalizedtrees.core import AbstractTreeEstimator
 from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.constraints import LEQConstraint, GTConstraint
-from generalizedtrees.sampling import gaussian_rejection_sample
+from generalizedtrees.sampling import rejection_sample_generator
 from generalizedtrees.scores import gini
 from scipy.stats import mode
-import numpy as np
 
 logger = logging.getLogger()
 
 
-class TrepanLike(BaseEstimator, ClassifierMixin, AbstractTreeEstimator):
+def make_trepanlike_classifier(classifier, generator=None, constrained_generator=None):
 
-    def __init__(self, classifier, s_min=20, max_depth=5, score=gini):
-        self.feature_means = None
-        self.feature_sigmas = None
-        self.classifier = classifier
-        self.s_min = s_min
-        self.max_depth = max_depth
-        self.score = score
-        super().__init__()
+    if generator is None:
+        if constrained_generator is None:
+            raise ValueError()
+    else:
+        constrained_generator = rejection_sample_generator(generator)
 
-    def oracle_sample(self, constraints, n=None):
+    class TrepanLikeClassifier(ClassifierMixin, AbstractTreeEstimator):
 
-        if n is None:
-            n = self.s_min
+        def __init__(self, s_min=20, max_depth=5, score=gini):
+            self.s_min = s_min
+            self.max_depth = max_depth
+            self.score = score
+            super().__init__()
 
-        data = gaussian_rejection_sample(self.feature_means, self.feature_sigmas, n, constraints)
+        def oracle_sample(self, constraints, n=None):
 
-        return data, self.classifier.predict(data)
+            if n is None:
+                n = self.s_min
 
-    def best_split(self, constraints):
+            data = constrained_generator(n, constraints)
 
-        best_split = []
+            return data, classifier.predict(data)
 
-        if len(constraints) < self.max_depth:
+        def best_split(self, constraints):
 
-            features, targets = self.oracle_sample(constraints)
+            best_split = []
 
-            best_score = self.score(targets)
+            if len(constraints) < self.max_depth:
 
-            for x_i in features:
-                for feature in range(len(x_i)):
-                    branches = [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
+                features, targets = self.oracle_sample(constraints)
 
-                    scores = [self.score(self.oracle_sample(constraints+(branch,))[1]) for branch in branches]
+                best_score = self.score(targets)
 
-                    candidate_score = sum(scores)/len(branches)
+                for x_i in features:
+                    for feature in range(len(x_i)):
+                        branches = [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
 
-                    if candidate_score < best_score:
-                        best_score = candidate_score
-                        best_split = branches
+                        scores = [self.score(self.oracle_sample(constraints+(branch,))[1]) for branch in branches]
 
-        return best_split
+                        candidate_score = sum(scores)/len(branches)
 
-    def leaf_predictor(self, constraints):
-        _, targets = self.oracle_sample(constraints)
-        return SimplePredictor(mode(targets)[0])
+                        if candidate_score < best_score:
+                            best_score = candidate_score
+                            best_split = branches
 
-    def fit(self, data, targets):
-        self.feature_means = np.mean(data, axis=0)
-        self.feature_sigmas = np.std(data, axis=0)
-        self.build()
+            return best_split
 
+        def leaf_predictor(self, constraints):
+            _, targets = self.oracle_sample(constraints)
+            return SimplePredictor(mode(targets)[0])
 
-if __name__ == "__main__":
+        def check_data_for_predict(self, data):
+            # Current implementation is no-op
+            return data
 
-    from generalizedtrees.evaluations import eval_mimic_on_iris
+    return TrepanLikeClassifier
 
-    logging.basicConfig(level=5)
-
-    eval_mimic_on_iris(TrepanLike)
