@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.com/Craven-Biostat-Lab/generalizedtrees.svg?branch=master)](https://travis-ci.com/Craven-Biostat-Lab/generalizedtrees)
+[![codecov](https://codecov.io/gh/Craven-Biostat-Lab/generalizedtrees/branch/master/graph/badge.svg)](https://codecov.io/gh/Craven-Biostat-Lab/generalizedtrees)
 
 # generalizedtrees
 Library for tree models: decision trees, model trees, mimic models, etc.
