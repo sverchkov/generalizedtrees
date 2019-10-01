@@ -8,7 +8,10 @@
 Library for tree models: decision trees, model trees, mimic models, etc.
 
 ## Dependencies
-Requires Python 3.6 or greater. See `requirements.txt` for python package dependencies.
+ * Python (>=3.6)
+ * scikit-learn (>=0.21.3)
+ * NumPy (>=1.17.2)
+ * SciPy (>=1.3.1)
 
 ## Development
 
