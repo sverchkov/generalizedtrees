@@ -1,14 +1,27 @@
 language: python
 
-python:
-  - "3.6"
-  - "3.7"
+matrix:
+  include:
 
-install:
-  - pip install -r requirements.txt -r testing-requirements.txt
+    - name: "Using oldest compatible package versions"
+      python: "3.6"
+      script:
+        - pytest
+      install:
+        - pip install -r oldest-requirements.txt -r testing-requirements.txt
 
-script:
-  - pytest --cov=generalizedtrees --cov-report xml
+    - name: "Using up to date packages with python 3.6"
+      python: "3.6"
+      script:
+        - pytest
+      install:
+        - pip install -r requirements.txt -r testing-requirements.txt
 
-after_success:
-  - codecov
+    - name: "Using up to date packages with python 3.7"
+      python: "3.7"
+      script:
+        - pytest --cov=generalizedtrees --cov-report xml
+      install:
+        - pip install -r requirements.txt -r testing-requirements.txt -r coverage-requirements.txt
+      after_success:
+        - codecov
