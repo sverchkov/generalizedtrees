@@ -4,11 +4,16 @@ python:
   - "3.6"
   - "3.7"
 
-install:
-  - pip install -r requirements.txt -r testing-requirements.txt
+matrix:
+  include:
+    - name: "Using oldest compatible package versions"
+      install:
+        - pip install -r oldest-requirements.txt -r testing-requirements.txt
+    - name: "Using up to date packages"
+      install:
+        - pip install -r requirements.txt -r testing-requirements.txt
+      after_success:
+        - codecov
 
 script:
   - pytest --cov=generalizedtrees --cov-report xml
-
-after_success:
-  - codecov

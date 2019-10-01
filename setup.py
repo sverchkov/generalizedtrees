@@ -20,6 +20,9 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+with open("oldest-requirements.txt") as fh:
+    requirements = fh.read().replace("==", ">=")
+
 setup(
     name="generalizedtrees",
     version="0.0.3",
@@ -32,11 +35,7 @@ setup(
     keywords="machine learning decision trees model",
     url="https://github.com/Craven-Biostat-Lab/generalizedtrees",
     packages=['generalizedtrees'],
-    install_requires=[
-        'scikit-learn',
-        'numpy',
-        'scipy'
-    ],
+    install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
