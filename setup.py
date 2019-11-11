@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-with open("oldest-requirements.txt") as fh:
+with open("minimum-versions/requirements.txt") as fh:
     requirements = fh.read().replace("==", ">=")
 
 setup(

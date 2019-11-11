@@ -8,7 +8,7 @@ matrix:
       script:
         - pytest
       install:
-        - pip install -r oldest-requirements.txt -r testing-requirements.txt
+        - pip install -r minimum-versions/requirements.txt -r testing-requirements.txt
 
     - name: "Using up to date packages with python 3.6"
       python: "3.6"
