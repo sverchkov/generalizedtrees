@@ -1,4 +1,13 @@
+# Development environment
 venv
+*/__pycache__
+
 # PyCharm files
 *.xml
 *.iml
+.idea
+
+# Building environment
+build
+dist
+generalizedtrees.egg-info
