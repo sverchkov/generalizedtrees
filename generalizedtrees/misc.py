@@ -1,6 +1,7 @@
-# Scoring functions
+# Miscellaneous utility functions and classes
+# TODO: In more stable versions, find them a home or delete them if unused.
 #
-# Copyright 2019 Yuriy Sverchkov
+# Copyright 2020 Yuriy Sverchkov
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,32 +15,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 
+class InfiniteBucket:
+    """
+    An infinitely iterable and iterable object that contains only returns one thing
+    """
 
-def frequencies(y):
-    values = np.unique(y)
-    return np.array([sum(y == v) for v in values])
+    def __init__(self, thing):
+        self.thing = thing
 
+    def __iter__(self):
+        return self.thing
 
-def gini(y):
-    n: int = len(y)
-
-    if n == 0:
-        return 0
-
-    p = frequencies(y)/n
-
-    return 1 - sum(p*p)
-
-
-def entropy(y):
-    n = len(y)
-
-    if n == 0:
-        return 0
-
-    p = frequencies(y)/n
-    pl2p = np.where(p > 0, -p*np.log2(p), 0)
-
-    return sum(pl2p)
+    def __getitem__(self, item):
+        return self.thing

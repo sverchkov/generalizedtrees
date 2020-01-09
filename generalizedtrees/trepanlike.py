@@ -20,21 +20,43 @@ import logging
 from sklearn.base import ClassifierMixin
 from generalizedtrees.core import AbstractTreeEstimator
 from generalizedtrees.leaves import SimplePredictor
-from generalizedtrees.constraints import LEQConstraint, GTConstraint
+
 from generalizedtrees.sampling import rejection_sample_generator
 from generalizedtrees.scores import gini
+from generalizedtrees import splitting
 from scipy.stats import mode
 
 logger = logging.getLogger()
 
 
-def make_trepanlike_classifier(classifier, generator=None, constrained_generator=None):
+def make_trepanlike_classifier(
+        classifier,
+        splitting_strategies=None,
+        generator=None,
+        constrained_generator=None):
+    """
+    Make a Trepan-like mimic tree classifier
+    :param classifier:
+    :param splitting_strategies: Describes how to split each feature (None (the default) is a `<=` vs `>` split)
+    :param generator:
+    :param constrained_generator:
+    :return: Class object whose instances are mimic trees
+    """
 
     if generator is None:
         if constrained_generator is None:
             raise ValueError()
     else:
         constrained_generator = rejection_sample_generator(generator)
+
+    ## Establish splitting strategies:
+
+    if splitting_strategies is None:
+        def splitting_strategies(feature, data):
+            return splitting.binary_threshold(data, feature)
+
+    if isinstance(splitting_strategies, list):
+        splitting_strategies = splitting.compose_splitting_strategies(splitting_strategies)
 
     class TrepanLikeClassifier(ClassifierMixin, AbstractTreeEstimator):
 
@@ -45,6 +67,12 @@ def make_trepanlike_classifier(classifier, generator=None, constrained_generator
             super().__init__()
 
         def oracle_sample(self, constraints, n=None):
+            """
+            Generate samples using the oracle
+            :param constraints: The cumulative set of constraints at this point in the tree
+            :param n: The number of samples to generate
+            :return: A tuple of data (n-by-features numpy array) and oracle predictions (length n vector)
+            """
 
             if n is None:
                 n = self.s_min
@@ -63,9 +91,9 @@ def make_trepanlike_classifier(classifier, generator=None, constrained_generator
 
                 best_score = self.score(targets)
 
-                for x_i in features:
-                    for feature in range(len(x_i)):
-                        branches = [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
+                for feature in range(features.shape[2]):
+
+                    for branches in splitting_strategies(feature, features):
 
                         scores = [self.score(self.oracle_sample(constraints+(branch,))[1]) for branch in branches]
 
