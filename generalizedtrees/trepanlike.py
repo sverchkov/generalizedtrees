@@ -115,3 +115,16 @@ def make_trepanlike_classifier(
 
     return TrepanLikeClassifier
 
+
+def make_trepan_classifier():
+    """
+    Implementation of Trepan (Craven and Shavlik 1996)
+
+    An implementation of Trepan, particularly:
+    * Uses m-of-n splits
+    * Uses marginal kernel density estimation (with bandwidth sigma=1/sqrt(m) where m is the number of samples)
+    for continuous variables
+    * Uses the empirical distribution for discrete variables
+    """
+
+    raise NotImplementedError
