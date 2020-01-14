@@ -25,6 +25,7 @@ from generalizedtrees.sampling import rejection_sample_generator
 from generalizedtrees.scores import gini
 from generalizedtrees import splitting
 from scipy.stats import mode
+from numpy import shape
 
 logger = logging.getLogger()
 
@@ -91,7 +92,7 @@ def make_trepanlike_classifier(
 
                 best_score = self.score(targets)
 
-                for feature in range(features.shape[2]):
+                for feature in range(shape(features)[1]):
 
                     for branches in splitting_strategies(feature, features):
 
