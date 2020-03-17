@@ -1,2 +1,2 @@
 pytest-cov==2.8.1
-codecov==2.0.15
+codecov==2.0.17
