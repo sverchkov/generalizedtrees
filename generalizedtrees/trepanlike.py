@@ -122,9 +122,10 @@ def make_trepan_classifier():
 
     An implementation of Trepan, particularly:
     * Uses m-of-n splits
-    * Uses marginal kernel density estimation (with bandwidth sigma=1/sqrt(m) where m is the number of samples)
-    for continuous variables
+    * Uses marginal kernel density estimation (with bandwidth sigma=1/sqrt(m) where m is
+    the number of samples) for continuous variables
     * Uses the empirical distribution for discrete variables
+    * Statistical test used to determine what distribution of X to use at any given branch
     """
 
     raise NotImplementedError
