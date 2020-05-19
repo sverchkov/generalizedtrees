@@ -18,13 +18,17 @@
 
 import logging
 from sklearn.base import ClassifierMixin
-from generalizedtrees.core import AbstractTreeEstimator
+from generalizedtrees.core import AbstractTreeEstimator, Node, ChildSelector
 from generalizedtrees.leaves import SimplePredictor
 
 from generalizedtrees.sampling import rejection_sample_generator
 from generalizedtrees.scores import gini
 from generalizedtrees import splitting
 from scipy.stats import mode
+
+from heapq import heappush, heappop
+from statistics import mode
+import numpy as np
 
 logger = logging.getLogger()
 
@@ -116,7 +120,7 @@ def make_trepanlike_classifier(
     return TrepanLikeClassifier
 
 
-def make_trepan_classifier():
+class Trepan(): # TODO: class hierarchy?
     """
     Implementation of Trepan (Craven and Shavlik 1996)
 
@@ -128,4 +132,99 @@ def make_trepan_classifier():
     * Statistical test used to determine what distribution of X to use at any given branch
     """
 
-    raise NotImplementedError
+    def __init__(self):
+        # Note: parameters passed to self sould define *how* the explanation tree is built
+        # Note: init should declare all members
+        self.root:Node
+        self.oracle = None # f(x) -> y
+        self.train_features = None # training set x (no y's)
+        self.feature_spec = None # Array of feature specs
+        self.min_sample = None # A parameter
+        # + some stopping criteria
+
+    def new_generator(self, data):
+        """
+        Returns a new data generator fit to data.
+        """
+        raise NotImplementedError # TODO
+
+    def construct_split(self, data, targets):
+        raise NotImplementedError # TODO
+
+    def fit(self, data, oracle):
+        # Note: parameters passed to fit should represent problem-specific details
+
+        self.oracle = oracle
+
+        # Targets of training data
+        targets = self.oracle(data) 
+
+        # Initialize root
+        self.root = Node()
+
+        # n is the number of samples
+        n:int = data.shape[0] 
+
+        # Root node extra data generator
+        generator = self.new_generator(data) 
+
+        # Root node extra data
+        generated_data = self.draw_sample((), self.min_sample-n, generator)
+
+        # Classify extra data
+        generated_targets = self.oracle(generated_data)
+
+        # Initialize root's prediction function
+        self.root.model = SimplePredictor(mode(np.append(targets, generated_targets)))
+
+        # Heap members are tuples with:
+        # "Search" score, node ptr, (Indexes of?) training data, synthetic data
+        # The constraint set is associated with the node so it doesn't need to be tracked
+        heap = [(0, self.root, range(n), generated_data, generated_targets)]
+
+        while heap: # Add global criteria check
+
+            score, parent, training_idxs, generated_data, generated_targets = heappop(heap)
+
+            split = self.construct_split(
+                np.append(data[training_idxs], generated_data),
+                np.append(targets[training_idxs], generated_targets))
+            
+            children = [Node(s, parent) for s in split]
+            parent.model = ChildSelector(children)
+
+            for child in children:                
+                # Filter training data that gets to the child node
+                child_ts_idxs = [i for i in training_idxs if child.constraint.test(data[i])]
+
+                # Re-estimate generator at child node
+                child_model = self.new_generator(data[child_ts_idxs])
+
+                # Generate data for child node
+                child_generated_data = self.draw_sample(child.all_constraints, self.min_sample-len(child_ts_idxs), child_model)
+
+                # Classify generated data
+                child_generated_targets = self.oracle(child_generated_data)
+
+                # Initialize child's prediction function
+                class_estimate = mode(np.append(targets[child_ts_idxs], child_generated_targets))
+                child.model = SimplePredictor(class_estimate)
+
+                # TODO: local stopping criteria
+                if not all( targets[child_ts_idxs] == class_estimate):
+                    # Node score is the negative of:
+                    #   f(N) = reach(N) (1-fidelity(N))
+                    # We need to track these as we traverse the tree.
+
+                    score = None # TODO
+                    heappush(heap, (score, child, child_ts_idxs, child_generated_data, child_generated_targets))
+
+        return self
+
+    def draw_sample(self, constraints, n, generator):
+        # Original implementation draws samples one at a time.
+        # May be worth optimizing.
+        return [self.draw_instance(constraints, generator) for i in range(max(0,n))]
+
+    def draw_instance(self, constraints, generator):
+        pass # TODO. See page 50 of thesis
