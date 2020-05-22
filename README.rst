@@ -24,6 +24,14 @@ generalizedtrees
 
 Library for tree models: decision trees, model trees, mimic models, etc.
 
+Installation
+============
+
+The latest stable version is on PyPI.
+Install it with
+
+    pip install generalizedtrees
+
 Dependencies
 ============
  * Python (>=3.6)
@@ -35,6 +43,20 @@ Development
 ===========
 
 We use the `GitHub issue tracker`_ for bugs and feature requests.
+
+Building
+--------
+
+We use the standard Python process for building the package.
+Run
+
+    python setup.py building
+
+to locally build the package, and
+
+    python setup.py install
+
+to install the locally built package.
 
 Testing
 -------
