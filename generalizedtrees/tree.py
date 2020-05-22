@@ -1,5 +1,21 @@
+# Tests for our tree data structure
+#
+# Copyright 2020 Yuriy Sverchkov
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from collections import deque
-from typing import Iterable, Any, List, NamedTuple
+from typing import Iterable, Any, List, NamedTuple, Union
 
 class TreeNode:
     """
@@ -19,7 +35,11 @@ class TreeNode:
         self.content = content
 
     @property
-    def tree(self) -> Tree:
+    def depth(self) -> int:
+        return self._depth
+
+    @property
+    def tree(self) -> 'Tree':
         return self._tree
 
     @property
@@ -29,13 +49,13 @@ class TreeNode:
     def __len__(self) -> int:
         return len(self._children)
 
-    def __getitem__(self, key) -> Iterable['TreeNode']:
+    def __getitem__(self, key) -> Union['TreeNode', Iterable['TreeNode']]:
         """
         We use slices to access child nodes
         """
         return self._tree[self._children[key]]
 
-    def set_children(self, children_contents):
+    def add_children(self, children_contents):
         n = len(self._tree)
         k = len(children_contents)
         idxs = range(n, n+k)
@@ -47,9 +67,9 @@ class TreeNode:
                 parent = self._index,
                 depth = new_depth,
                 content = c)
-            for c, i in zip(idxs, children_contents)
+            for i, c in zip(idxs, children_contents)
         ])
-        self._children = idxs
+        self._children.extend(idxs)
         if new_depth > self._tree._tree_depth:
             self._tree._tree_depth = new_depth
     
@@ -77,11 +97,15 @@ class Tree:
     def __len__(self) -> int:
         return len(self._nodes)
 
-    def __getitem__(self, key) -> TreeNode:
+    def __getitem__(self, key) -> Union[TreeNode, Iterable[TreeNode]]:
+
         if key == 'root':
             return self._nodes[0]
         
-        return self._nodes[key]
+        if isinstance(key, int) or isinstance(key, slice):
+            return self._nodes[key]
+
+        return [self._nodes[i] for i in key]
 
     @property
     def root(self) -> TreeNode:
@@ -91,20 +115,20 @@ class Tree:
 def tree_to_str(tree: Tree) -> str:
 
     # Constants for tree drawing. Defining them here in case we want to customize later.
-    space = ' '
-    trunk = '|'
-    mid_branch = '+'
-    last_branch = '+'
+    space = '   '
+    trunk = '|  '
+    mid_branch = '+--'
+    last_branch = '+--'
     endline = '\n'
 
     result:str = ''
-    stack = deque(tree.root)
-    continuing = [0 for _ in range(tree.depth)]
+    stack = deque([tree.root])
+    continuing = [0 for _ in range(tree.depth+1)]
 
     while stack:
 
         node = stack.pop()
-        stack.extend(node[:])
+        stack.extend(reversed(node[:]))
         continuing[node.depth] += len(node)
 
         if node.depth > 0:
@@ -113,5 +137,9 @@ def tree_to_str(tree: Tree) -> str:
             continuing[node.depth-1] -= 1
             result += mid_branch if continuing[node.depth-1] else last_branch
         
-        result += str(node.content) + endline
+        result += str(node.content)
+        if stack:
+            result += endline
+    
+    return result
 
