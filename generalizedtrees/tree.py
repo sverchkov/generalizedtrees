@@ -1,4 +1,4 @@
-# Tests for our tree data structure
+# Tree data structure
 #
 # Copyright 2020 Yuriy Sverchkov
 #
@@ -19,10 +19,12 @@ from typing import Iterable, Any, List, NamedTuple, Union
 
 class TreeNode:
     """
-    An interface for manipulating a tree via its nodes
+    A base class for the nodes of a tree.
+    This class defines all the bookkeeping variables needed to maintain a tree.
+    Meant to be extended to classes that hold actual content at nodes.
     """
 
-    def __init__(self, tree: 'Tree', index: int, parent: int, depth: int, content: Any):
+    def __init__(self, tree: 'Tree' = None, index: int = 0, parent: int = -1, depth: int = 0):
 
         # Private members
         self._tree: Tree = tree
@@ -31,8 +33,14 @@ class TreeNode:
         self._children: Iterable[int] = []
         self._depth: int = depth
 
-        # Public members
-        self.content = content
+    def plant_tree(self):
+        """
+        Make a tree rooted at this node.
+        This node becomes attached to the new tree.
+        """
+        #if self._tree is not None: raise some exception
+        self._tree = Tree(self)
+        return self._tree
 
     @property
     def depth(self) -> int:
@@ -40,6 +48,7 @@ class TreeNode:
 
     @property
     def tree(self) -> 'Tree':
+        # if self._tree is None: raise some exception
         return self._tree
 
     @property
@@ -55,23 +64,20 @@ class TreeNode:
         """
         return self._tree[self._children[key]]
 
-    def add_children(self, children_contents):
+    def add_child(self, child: 'TreeNode'):
+        # TODO: Add check that child isn't already in some tree
+        # TODO: Add check that child doesn't have children set
+        child._tree = self._tree
+        child._children = []
+        child._parent = self._index
         n = len(self._tree)
-        k = len(children_contents)
-        idxs = range(n, n+k)
-        new_depth = self._depth + 1
-        self._tree._nodes.extend([
-            TreeNode(
-                tree = self._tree,
-                index = i,
-                parent = self._index,
-                depth = new_depth,
-                content = c)
-            for i, c in zip(idxs, children_contents)
-        ])
-        self._children.extend(idxs)
-        if new_depth > self._tree._tree_depth:
-            self._tree._tree_depth = new_depth
+        child._index = n
+        self._children.append(n)
+        self._tree._nodes.append(child)
+        d = self._depth + 1
+        child._depth = d
+        if self._tree.depth < d:
+            self._tree.depth = d
     
     def parent(self):
         return self._tree[self._parent]
@@ -79,11 +85,12 @@ class TreeNode:
 
 class Tree:
     """
-    A container-like tree data structure
+    A container-like tree data structure.
+    Alwatys meant to be initialized with a tree node.
     """
 
-    def __init__(self, content):
-        self._nodes = [TreeNode(self, 0, -1, 0, content)]
+    def __init__(self, node: TreeNode):
+        self._nodes = [node]
         self._tree_depth = 0
 
     @property
@@ -112,7 +119,7 @@ class Tree:
         return self._nodes[0]
 
 
-def tree_to_str(tree: Tree) -> str:
+def tree_to_str(tree: Tree, content_str = lambda x: str(x)) -> str:
 
     # Constants for tree drawing. Defining them here in case we want to customize later.
     space = '   '
@@ -137,7 +144,7 @@ def tree_to_str(tree: Tree) -> str:
             continuing[node.depth-1] -= 1
             result += mid_branch if continuing[node.depth-1] else last_branch
         
-        result += str(node.content)
+        result += content_str(node)
         if stack:
             result += endline
     

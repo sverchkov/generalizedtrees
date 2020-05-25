@@ -17,6 +17,10 @@
 # limitations under the License.
 
 import logging
+
+from collections import namedtuple
+from generalizedtrees.tree import TreeNode, Tree
+
 from sklearn.base import ClassifierMixin
 from generalizedtrees.core import AbstractTreeEstimator, Node, ChildSelector
 from generalizedtrees.leaves import SimplePredictor
@@ -132,15 +136,36 @@ class Trepan(): # TODO: class hierarchy?
     * Statistical test used to determine what distribution of X to use at any given branch
     """
 
-    def __init__(self):
+    class Node(TreeNode):
+
+        def __init__(self):
+            # TODO: Set types
+            self.score = None
+            self.constraints = None
+            self.training_idx = None
+            self.generator = None
+            self.gen_data = None
+            self.gen_targets = None
+            self.prediction = None
+            self.fidelity = None
+            self.coverage = None
+            super().__init__()
+
+        # TODO: Add comparator
+
+
+    def __init__(self, max_tree_size = 10):
         # Note: parameters passed to self sould define *how* the explanation tree is built
         # Note: init should declare all members
-        self.root:Node
+
+        self.tree: Tree
         self.oracle = None # f(x) -> y
         self.train_features = None # training set x (no y's)
         self.feature_spec = None # Array of feature specs
         self.min_sample = None # A parameter
-        # + some stopping criteria
+
+        # Stopping criteria:
+        self.max_tree_size = max_tree_size
 
     def new_generator(self, data):
         """
@@ -151,73 +176,96 @@ class Trepan(): # TODO: class hierarchy?
     def construct_split(self, data, targets):
         raise NotImplementedError # TODO
 
-    def fit(self, data, oracle):
+    def fit(self, data, oracle, max_tree_size = None):
         # Note: parameters passed to fit should represent problem-specific details
+        # Max tree size can be seen as problem-specific, so we include it here too.
+        if max_tree_size is not None:
+            self.max_tree_size = max_tree_size
 
         self.oracle = oracle
 
         # Targets of training data
-        targets = self.oracle(data) 
-
-        # Initialize root
-        self.root = Node()
+        targets = self.oracle(data)
 
         # n is the number of samples
-        n:int = data.shape[0] 
+        n: int = data.shape[0]
+
+        # Init root node and tree
+        root = Trepan.Node()
+        self.tree = root.plant_tree()
 
         # Root node extra data generator
-        generator = self.new_generator(data) 
+        root.generator = self.new_generator(data) 
 
         # Root node extra data
-        generated_data = self.draw_sample((), self.min_sample-n, generator)
+        root.gen_data = self.draw_sample((), self.min_sample-n, root.generator)
 
         # Classify extra data
-        generated_targets = self.oracle(generated_data)
+        root.gen_targets = self.oracle(root.gen_data)
 
-        # Initialize root's prediction function
-        self.root.model = SimplePredictor(mode(np.append(targets, generated_targets)))
+        # Estimate root's prediction
+        root.prediction = mode(np.append(targets, root.gen_targets))
 
-        # Heap members are tuples with:
-        # "Search" score, node ptr, (Indexes of?) training data, synthetic data
-        # The constraint set is associated with the node so it doesn't need to be tracked
-        heap = [(0, self.root, range(n), generated_data, generated_targets)]
+        # Estimate root's fidelity
+        root.fidelity = np.mean(np.append(targets, root.gen_targets) == root.prediction)
 
-        while heap: # Add global criteria check
+        # Other housekeeping
+        root.training_idx = range(n)
+        root.coverage = 1
+        root.score = 0
+        root.constraints = ()
 
-            score, parent, training_idxs, generated_data, generated_targets = heappop(heap)
+        # Insert into heap
+        heap = [root]
 
-            split = self.construct_split(
-                np.append(data[training_idxs], generated_data),
-                np.append(targets[training_idxs], generated_targets))
+        while heap and self.tree.size < self.max_tree_size:
+
+            node = heappop(heap)
             
-            children = [Node(s, parent) for s in split]
-            parent.model = ChildSelector(children)
+            split = self.construct_split(
+                np.append(data[node.training_idxs], node.gen_data),
+                np.append(targets[node.training_idxs], node.gen_targets))
+            
+            for constraint in split: # TODO: Continue from here
 
-            for child in children:                
+                # Initialize a child node
+                child = Trepan.Node()
+                node.add_child(child)
+                child.constraints = node.constraints + (constraint,)
+
                 # Filter training data that gets to the child node
-                child_ts_idxs = [i for i in training_idxs if child.constraint.test(data[i])]
+                child.training_idx = [i for i in node.training_idx if constraint.test(data[i])]
 
                 # Re-estimate generator at child node
-                child_model = self.new_generator(data[child_ts_idxs])
+                child.generator = self.new_generator(data[child.training_idx])
 
                 # Generate data for child node
-                child_generated_data = self.draw_sample(child.all_constraints, self.min_sample-len(child_ts_idxs), child_model)
+                child.gen_data = self.draw_sample(
+                    child.constraints,
+                    self.min_sample-len(child.training_idx),
+                    child.generator)
 
                 # Classify generated data
-                child_generated_targets = self.oracle(child_generated_data)
+                child.gen_targets = self.oracle(child.gen_data)
 
-                # Initialize child's prediction function
-                class_estimate = mode(np.append(targets[child_ts_idxs], child_generated_targets))
-                child.model = SimplePredictor(class_estimate)
+                # Compute child's prediction
+                child.prediction = mode(np.append(targets[child.training_idx], child.gen_targets))
 
+                # Estimate child's fidelity
+                child.fidelity = np.mean(np.append(targets, child.gen_targets) == child.prediction)
+
+                child.coverage = \
+                    (len(child.training_idx) + sum(constraint.test(node.gen_data))) / \
+                    (len(node.training_idx) + len(node.gen_data)) * \
+                    node.coverage
+                
+                # Node score is the negative of:
+                #   f(N) = reach(N) (1-fidelity(N))
+                child.score = -(child.coverage * (1 - child.fidelity))
+                
                 # TODO: local stopping criteria
-                if not all( targets[child_ts_idxs] == class_estimate):
-                    # Node score is the negative of:
-                    #   f(N) = reach(N) (1-fidelity(N))
-                    # We need to track these as we traverse the tree.
-
-                    score = None # TODO
-                    heappush(heap, (score, child, child_ts_idxs, child_generated_data, child_generated_targets))
+                if not all( targets[child.training_idx] == child.prediction):
+                    heappush(heap, child)
 
         return self
 
