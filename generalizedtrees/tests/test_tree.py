@@ -19,9 +19,14 @@ from generalizedtrees.tree import TreeNode, tree_to_str
 def test_tree_building():
 
     class CharNode(TreeNode):
+
         def __init__(self, label):
             self.label = label
             super().__init__()
+
+        def __str__(self):
+            return self.label
+    
     
     r = CharNode("A")
     t = r.plant_tree()
@@ -42,3 +47,10 @@ def test_tree_building():
     print(t[:])
 
     print(tree_to_str(t))
+
+if __name__ == "__main__":
+    import logging
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(level=5)
+
+    test_tree_building()
