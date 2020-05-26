@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.trepanlike import make_trepanlike_classifier
+from generalizedtrees.explainers import make_trepanlike_classifier
 from sklearn.utils.estimator_checks import check_estimator
 from numpy import random
 from sklearn import datasets
