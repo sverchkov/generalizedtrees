@@ -77,7 +77,7 @@ class TreeNode:
         d = self._depth + 1
         child._depth = d
         if self._tree.depth < d:
-            self._tree.depth = d
+            self._tree._tree_depth = d
     
     def parent(self):
         return self._tree[self._parent]
