@@ -1,4 +1,4 @@
-# Trepan-like mimic tree learner
+# Explanation tree learners
 #
 # Based on Trepan (Craven and Shavlik 1996)
 #
@@ -17,22 +17,21 @@
 # limitations under the License.
 
 import logging
-
+import numpy as np
 from collections import namedtuple
-from generalizedtrees.tree import TreeNode, Tree
-
-from sklearn.base import ClassifierMixin
-from generalizedtrees.core import AbstractTreeEstimator, Node, ChildSelector
+from generalizedtrees import splitting
+from generalizedtrees.core import FeatureSpec, AbstractTreeEstimator, Node, ChildSelector
 from generalizedtrees.leaves import SimplePredictor
-
 from generalizedtrees.sampling import rejection_sample_generator
 from generalizedtrees.scores import gini
-from generalizedtrees import splitting
-from scipy.stats import mode
-
+from generalizedtrees.tree import TreeNode, Tree
 from heapq import heappush, heappop
+from scipy.stats import mode
+from sklearn.base import ClassifierMixin
+from sklearn.neighbors import KernelDensity
 from statistics import mode
-import numpy as np
+from typing import Tuple
+
 
 logger = logging.getLogger()
 
@@ -154,33 +153,68 @@ class Trepan(): # TODO: class hierarchy?
         # TODO: Add comparator
 
 
-    def __init__(self, max_tree_size = 10):
+    def __init__(self, max_tree_size = 10, rng: np.random.Generator = np.random.default_rng()):
         # Note: parameters passed to self sould define *how* the explanation tree is built
         # Note: init should declare all members
 
         self.tree: Tree
         self.oracle = None # f(x) -> y
         self.train_features = None # training set x (no y's)
-        self.feature_spec = None # Array of feature specs
+        self.feature_spec: Tuple[FeatureSpec, ...] # Tuple of feature specs
         self.min_sample = None # A parameter
+        self.rng = rng
 
         # Stopping criteria:
         self.max_tree_size = max_tree_size
+
+    def _feature_generator(self, data_vector, feature: FeatureSpec):
+
+        n = len*data_vector
+
+        if feature is FeatureSpec.CONTINUOUS:
+            # Sample from a KDE.
+            # We use Generator and not RandomState but KDE implementations use RandomState
+            # so it's more reliable to just implement the sampling here. 
+            return lambda: self.rng.normal(
+                loc = self.rng.choice(data_vector, size=1),
+                scale = 1/np.sqrt(n),
+                size = 1)
+
+        elif feature & FeatureSpec.DISCRETE:
+            # Check if we observe multiple values
+            values, counts = np.unique(data_vector, return_counts=True)
+            return lambda: self.rng.choice(values, p=counts/n)
+        
+        else:
+            raise ValueError(f"I don't know how to handle feature spec {feature}")
 
     def new_generator(self, data):
         """
         Returns a new data generator fit to data.
         """
-        raise NotImplementedError # TODO
+
+        _, d = data.shape
+        assert len(self.feature_spec == d) # Sanity check
+        #assert n > 0 # Sanity check also.
+
+        # The Trepan generator independently generates the individual feature values.
+        feature_generators = [
+            self._feature_generator(data[:,i], self.feature_spec[i])
+            for i in range(d)]
+
+        return lambda: [f() for f in feature_generators]
 
     def construct_split(self, data, targets):
         raise NotImplementedError # TODO
 
-    def fit(self, data, oracle, max_tree_size = None):
+    def fit(self, data, oracle, feature_spec: Tuple[FeatureSpec, ...], max_tree_size = None):
         # Note: parameters passed to fit should represent problem-specific details
         # Max tree size can be seen as problem-specific, so we include it here too.
         if max_tree_size is not None:
             self.max_tree_size = max_tree_size
+
+        # TODO: Automatic inference of feature spec
+        self.feature_spec = feature_spec
 
         self.oracle = oracle
 
@@ -272,7 +306,14 @@ class Trepan(): # TODO: class hierarchy?
     def draw_sample(self, constraints, n, generator):
         # Original implementation draws samples one at a time.
         # May be worth optimizing.
-        return [self.draw_instance(constraints, generator) for i in range(max(0,n))]
+        return [self.draw_instance(constraints, generator) for _ in range(max(0,n))]
 
-    def draw_instance(self, constraints, generator):
-        pass # TODO. See page 50 of thesis
+    def draw_instance(self, constraints, generator, max_attempts = 100):
+        
+        for _ in range(max_attempts):
+            instance = generator()
+            if all([c.test(instance) for c in constraints]):
+                return instance
+        
+        raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
+        # TODO: verify against page 50 of thesis
