@@ -139,7 +139,8 @@ class Trepan(): # TODO: class hierarchy?
         self,
         max_tree_size = 10,
         rng: np.random.Generator = np.random.default_rng(),
-        dist_test_alpha = 0.05):
+        dist_test_alpha = 0.05,
+        beam_width = 10):
         # Note: parameters passed to init sould define *how* the explanation tree is built
         # Note: init should declare all members
 
@@ -151,6 +152,7 @@ class Trepan(): # TODO: class hierarchy?
         self.min_sample = None # A parameter
         self.rng = rng
         self.dist_test_alpha = dist_test_alpha
+        self.beam_width = beam_width
 
         # Inferred values
         self._d: int
@@ -242,7 +244,7 @@ class Trepan(): # TODO: class hierarchy?
                     freq1 = [map1[v] if v in map1 else 0 for v in values]
                     freq2 = [map2[v] if v in map2 else 0 for v in values]
 
-                    _, p = chisquare(f_obs=freq_1, f_exp=freq_2, ddof=k-1)
+                    _, p = chisquare(f_obs=freq1, f_exp=freq2, ddof=k-1)
                     if p < min_p:
                         min_p = p
                     n_tests += 1
@@ -257,7 +259,60 @@ class Trepan(): # TODO: class hierarchy?
         return min_p < self.dist_test_alpha/n_tests
 
     def construct_split(self, data, targets):
-        raise NotImplementedError # TODO
+        split_candidates = self.make_split_candidates(data, targets)
+        best_split = ()
+        best_split_score = 0
+        for split in split_candidates:
+            new_score = self.split_score(split, data, targets)
+            if new_score > best_split_score:
+                best_split_score = new_score
+                best_split = split
+        
+        return self.construct_m_of_n_split(
+            best_split,
+            best_split_score,
+            split_candidates,
+            data,
+            targets)
+
+    def make_split_candidates(self, data, targets):
+        # Note: we could make splits based on original training examples only, or on
+        # training examples and generated examples
+        raise NotImplementedError
+
+    def split_score(self, split, data, targets):
+        raise NotImplementedError
+
+    def construct_m_of_n_split(
+        self,
+        best_split,
+        best_split_score,
+        split_candidates,
+        data,
+        targets):
+
+        beam = [(best_split_score, best_split)]
+        beam_changed = True
+        while beam_changed:
+            beam_changed = False
+
+            for split_score, split in beam:
+                for new_split in MofN.neighboring_tests(split, split_candidates):
+                    if self.tests_sig_diff(split, new_split): #+data?
+                        new_score = self.split_score(new_split, data, targets)
+                        # Pseudocode in paper didn't have this but it needs to be here, right?
+                        if len(beam) < self.beam_width:
+                            # We're modifying a list while iterating over it, but since we're adding,
+                            # this should be ok.
+                            beam.append((new_score, new_split))
+                            beam_changed = True
+                        else:
+                            worst = min(beam)
+                            if new_score > worst[0]: # Element 0 of the tuple is the score
+                                beam[beam.index(worst)] = (new_score, new_split)
+                                beam_changed = True
+        
+        return max(beam)[1] # Element 1 of the tuple is the split
 
     def fit(self, data, oracle, feature_spec: Tuple[FeatureSpec, ...], max_tree_size = None):
         # Note: parameters passed to fit should represent problem-specific details
@@ -329,7 +384,7 @@ class Trepan(): # TODO: class hierarchy?
                 child.training_idx = [i for i in node.training_idx if constraint.test(data[i])]
 
                 # Re-estimate generator at child node
-                if same_distribution(child.training_idx, node.generator.training_idx):
+                if self.same_distribution(child.training_idx, node.generator.training_idx):
                     child.generator = node.generator
                 else:
                     child.generator = self.new_generator(data[child.training_idx])
