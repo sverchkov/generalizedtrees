@@ -16,6 +16,7 @@
 
 
 from typing import List, Tuple
+from enum import Flag, auto
 from abc import ABC, abstractmethod
 from collections import deque
 from numpy import ndarray, empty, apply_along_axis
@@ -30,6 +31,13 @@ class Constraint(ABC):
     @abstractmethod
     def test(self, sample):
         pass
+
+
+class FeatureSpec(Flag):
+    ORDERED = auto()
+    DISCRETE = auto()
+    ORDINAL = ORDERED | DISCRETE
+    CONTINUOUS = ORDERED # And not discrete
 
 
 class Node:

@@ -26,7 +26,7 @@ from generalizedtrees.sampling import rejection_sample_generator
 from generalizedtrees.scores import gini
 from generalizedtrees.tree import TreeNode, Tree
 from heapq import heappush, heappop
-from scipy.stats import mode
+from scipy.stats import mode, ks_2samp, chisquare
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KernelDensity
 from statistics import mode
@@ -135,6 +135,31 @@ class Trepan(): # TODO: class hierarchy?
     * Statistical test used to determine what distribution of X to use at any given branch
     """
 
+    def __init__(
+        self,
+        max_tree_size = 10,
+        rng: np.random.Generator = np.random.default_rng(),
+        dist_test_alpha = 0.05):
+        # Note: parameters passed to init sould define *how* the explanation tree is built
+        # Note: init should declare all members
+
+        self.tree: Tree
+        self.data: np.ndarray
+        self.oracle = None # f(x) -> y
+        self.train_features = None # training set x (no y's)
+        self.feature_spec: Tuple[FeatureSpec, ...] # Tuple of feature specs
+        self.min_sample = None # A parameter
+        self.rng = rng
+        self.dist_test_alpha = dist_test_alpha
+
+        # Inferred values
+        self._d: int
+
+        # Stopping criteria:
+        self.max_tree_size: int = max_tree_size
+
+    Generator = namedtuple("Generator", ["generate", "training_idx"])
+
     class Node(TreeNode):
 
         def __init__(self):
@@ -143,6 +168,7 @@ class Trepan(): # TODO: class hierarchy?
             self.constraints = None
             self.training_idx = None
             self.generator = None
+            self.generator_src_node = None
             self.gen_data = None
             self.gen_targets = None
             self.prediction = None
@@ -152,24 +178,9 @@ class Trepan(): # TODO: class hierarchy?
 
         # TODO: Add comparator
 
-
-    def __init__(self, max_tree_size = 10, rng: np.random.Generator = np.random.default_rng()):
-        # Note: parameters passed to self sould define *how* the explanation tree is built
-        # Note: init should declare all members
-
-        self.tree: Tree
-        self.oracle = None # f(x) -> y
-        self.train_features = None # training set x (no y's)
-        self.feature_spec: Tuple[FeatureSpec, ...] # Tuple of feature specs
-        self.min_sample = None # A parameter
-        self.rng = rng
-
-        # Stopping criteria:
-        self.max_tree_size = max_tree_size
-
     def _feature_generator(self, data_vector, feature: FeatureSpec):
 
-        n = len*data_vector
+        n = len(data_vector)
 
         if feature is FeatureSpec.CONTINUOUS:
             # Sample from a KDE.
@@ -181,28 +192,69 @@ class Trepan(): # TODO: class hierarchy?
                 size = 1)
 
         elif feature & FeatureSpec.DISCRETE:
-            # Check if we observe multiple values
+            # Sample from the empirical distribution
             values, counts = np.unique(data_vector, return_counts=True)
             return lambda: self.rng.choice(values, p=counts/n)
         
         else:
             raise ValueError(f"I don't know how to handle feature spec {feature}")
 
-    def new_generator(self, data):
+    def new_generator(self, training_idx):
         """
         Returns a new data generator fit to data.
         """
 
-        _, d = data.shape
-        assert len(self.feature_spec == d) # Sanity check
-        #assert n > 0 # Sanity check also.
-
         # The Trepan generator independently generates the individual feature values.
         feature_generators = [
-            self._feature_generator(data[:,i], self.feature_spec[i])
-            for i in range(d)]
+            self._feature_generator(self.data[training_idx,i], self.feature_spec[i])
+            for i in range(self._d)]
 
-        return lambda: [f() for f in feature_generators]
+        return Trepan.Generator(
+            generate = lambda: [f() for f in feature_generators],
+            training_idx = training_idx)
+
+    def same_distribution(self, idx_1, idx_2):
+        """
+        Performs statistical test to determine if data subsets defined by indexes are from the
+        same distribution.
+        """
+        n_tests = 0
+        min_p = 1.0
+        for i in range(self._d):
+
+            if self.feature_spec[i] & FeatureSpec.DISCRETE:
+                # Get frequencies.
+                # Note: we're assuming that the union of values present in the samples is
+                # the set of possible values. This is not all possible values that the
+                # variable could originally take.
+                v1, c1 = np.unique(self.data[idx_1, i], return_counts=True)
+                map1 = {v1[j]: c1[j] for j in range(len(v1))}
+
+                v2, c2 = np.unique(self.data[idx_2, i], return_counts=True)
+                map2 = {v2[j]: c2[j] for j in range(len(v2))}
+
+                values = np.union1d(v1, v2)
+                k = len(values)
+
+                # If only one value is present skip this test
+                if k > 1:
+
+                    freq1 = [map1[v] if v in map1 else 0 for v in values]
+                    freq2 = [map2[v] if v in map2 else 0 for v in values]
+
+                    _, p = chisquare(f_obs=freq_1, f_exp=freq_2, ddof=k-1)
+                    if p < min_p:
+                        min_p = p
+                    n_tests += 1
+            
+            else:
+                # KS-test
+                _, p = ks_2samp(self.data[idx_1, i], self.data[idx_2, i])
+                if p < min_p:
+                    min_p = p
+                n_tests += 1
+
+        return min_p < self.dist_test_alpha/n_tests
 
     def construct_split(self, data, targets):
         raise NotImplementedError # TODO
@@ -212,6 +264,9 @@ class Trepan(): # TODO: class hierarchy?
         # Max tree size can be seen as problem-specific, so we include it here too.
         if max_tree_size is not None:
             self.max_tree_size = max_tree_size
+
+        self.data = data
+        _, self._d = np.shape(data)
 
         # TODO: Automatic inference of feature spec
         self.feature_spec = feature_spec
@@ -228,8 +283,12 @@ class Trepan(): # TODO: class hierarchy?
         root = Trepan.Node()
         self.tree = root.plant_tree()
 
+        # Root uses all training data
+        root.training_idx = range(n)
+
         # Root node extra data generator
-        root.generator = self.new_generator(data) 
+        root.generator = self.new_generator(data)
+        root.generator_training_idx = root.training_idx
 
         # Root node extra data
         root.gen_data = self.draw_sample((), self.min_sample-n, root.generator)
@@ -244,7 +303,6 @@ class Trepan(): # TODO: class hierarchy?
         root.fidelity = np.mean(np.append(targets, root.gen_targets) == root.prediction)
 
         # Other housekeeping
-        root.training_idx = range(n)
         root.coverage = 1
         root.score = 0
         root.constraints = ()
@@ -271,7 +329,10 @@ class Trepan(): # TODO: class hierarchy?
                 child.training_idx = [i for i in node.training_idx if constraint.test(data[i])]
 
                 # Re-estimate generator at child node
-                child.generator = self.new_generator(data[child.training_idx])
+                if same_distribution(child.training_idx, node.generator.training_idx):
+                    child.generator = node.generator
+                else:
+                    child.generator = self.new_generator(data[child.training_idx])
 
                 # Generate data for child node
                 child.gen_data = self.draw_sample(
