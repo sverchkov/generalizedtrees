@@ -32,6 +32,21 @@ class Constraint(ABC):
     def test(self, sample):
         pass
 
+    def __invert__(self):
+        return NegatedConstraint(self)
+
+
+class NegatedConstraint(Constraint):
+
+    def __init__(self, constraint):
+        self._constraint = constraint
+    
+    def test(self, sample):
+        return not self._constraint.test(sample)
+    
+    def __invert__(self):
+        return self._constraint
+
 
 class FeatureSpec(Flag):
     ORDERED = auto()

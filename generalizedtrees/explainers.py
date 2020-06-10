@@ -21,9 +21,11 @@ import numpy as np
 from collections import namedtuple
 from generalizedtrees import splitting
 from generalizedtrees.core import FeatureSpec, AbstractTreeEstimator, Node, ChildSelector
+from generalizedtrees.constraints import MofN
 from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.sampling import rejection_sample_generator
 from generalizedtrees.scores import gini
+from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
 from generalizedtrees.tree import TreeNode, Tree
 from heapq import heappush, heappop
 from scipy.stats import mode, ks_2samp, chisquare
@@ -140,7 +142,8 @@ class Trepan(): # TODO: class hierarchy?
         max_tree_size = 10,
         rng: np.random.Generator = np.random.default_rng(),
         dist_test_alpha = 0.05,
-        beam_width = 10):
+        use_m_of_n = True,
+        beam_width = 2):
         # Note: parameters passed to init sould define *how* the explanation tree is built
         # Note: init should declare all members
 
@@ -152,6 +155,7 @@ class Trepan(): # TODO: class hierarchy?
         self.min_sample = None # A parameter
         self.rng = rng
         self.dist_test_alpha = dist_test_alpha
+        self.use_m_of_n = use_m_of_n
         self.beam_width = beam_width
 
         # Inferred values
@@ -268,17 +272,33 @@ class Trepan(): # TODO: class hierarchy?
                 best_split_score = new_score
                 best_split = split
         
-        return self.construct_m_of_n_split(
-            best_split,
-            best_split_score,
-            split_candidates,
-            data,
-            targets)
+        # For testing if m-of-n splits are really useful
+        if self.use_m_of_n:
+            return self.construct_m_of_n_split(
+                best_split,
+                best_split_score,
+                split_candidates,
+                data,
+                targets)
+        else:
+            return best_split
 
     def make_split_candidates(self, data, targets):
         # Note: we could make splits based on original training examples only, or on
-        # training examples and generated examples
-        raise NotImplementedError
+        # training examples and generated examples.
+        # In the current form, this could be controlled by the calling function.
+
+        result = []
+
+        for j in range(self._d):
+            if self.feature_spec[j] is FeatureSpec.CONTINUOUS:
+                result.extend(fayyad_thresholds(data, targets, j))
+            elif self.feature_spec[j] & FeatureSpec.DISCRETE:
+                result.extend(one_vs_all(data, j))
+            else:
+                raise ValueError(f"I don't know how to handle feature spec {self.feature_spec[j]}")
+        
+        return result
 
     def split_score(self, split, data, targets):
         raise NotImplementedError
@@ -296,7 +316,7 @@ class Trepan(): # TODO: class hierarchy?
         while beam_changed:
             beam_changed = False
 
-            for split_score, split in beam:
+            for _, split in beam:
                 for new_split in MofN.neighboring_tests(split, split_candidates):
                     if self.tests_sig_diff(split, new_split): #+data?
                         new_score = self.split_score(new_split, data, targets)
@@ -312,7 +332,12 @@ class Trepan(): # TODO: class hierarchy?
                                 beam[beam.index(worst)] = (new_score, new_split)
                                 beam_changed = True
         
+        # TODO: literal pruning for test (see pages 57-58)
+
         return max(beam)[1] # Element 1 of the tuple is the split
+    
+    def tests_sig_diff(self, split, new_split):
+        raise NotImplementedError
 
     def fit(self, data, oracle, feature_spec: Tuple[FeatureSpec, ...], max_tree_size = None):
         # Note: parameters passed to fit should represent problem-specific details
