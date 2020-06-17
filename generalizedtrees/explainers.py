@@ -376,7 +376,7 @@ class Trepan(): # TODO: class hierarchy?
         self.tree = root.plant_tree()
 
         # Root uses all training data
-        root.training_idx = range(n)
+        root.training_idx = np.array(range(n))
 
         # Root node extra data generator
         root.generator = self.new_generator(data)
