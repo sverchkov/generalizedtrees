@@ -22,7 +22,8 @@ from sklearn.svm import SVC
 import pytest
 
 
-@pytest.mark.slow
+#@pytest.mark.slow
+@pytest.mark.skip(reason="phasing out trepanlike obsolete")
 def test_trepanlike_classifier_with_iris():
 
     # Load Iris

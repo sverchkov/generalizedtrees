@@ -19,12 +19,13 @@
 import logging
 import numpy as np
 from collections import namedtuple
+from functools import total_ordering
 from generalizedtrees import splitting
 from generalizedtrees.core import FeatureSpec, AbstractTreeEstimator, Node, ChildSelector
 from generalizedtrees.constraints import MofN
 from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.sampling import rejection_sample_generator
-from generalizedtrees.scores import gini
+from generalizedtrees.scores import gini, entropy
 from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
 from generalizedtrees.tree import TreeNode, Tree, tree_to_str
 from heapq import heappush, heappop
@@ -141,6 +142,7 @@ class Trepan(): # TODO: class hierarchy?
         self,
         max_tree_size = 10,
         rng: np.random.Generator = np.random.default_rng(),
+        min_sample = 20,
         dist_test_alpha = 0.05,
         use_m_of_n = True,
         beam_width = 2):
@@ -152,7 +154,7 @@ class Trepan(): # TODO: class hierarchy?
         self.oracle = None # f(x) -> y
         self.train_features = None # training set x (no y's)
         self.feature_spec: Tuple[FeatureSpec, ...] # Tuple of feature specs
-        self.min_sample = None # A parameter
+        self.min_sample = min_sample
         self.rng = rng
         self.dist_test_alpha = dist_test_alpha
         self.use_m_of_n = use_m_of_n
@@ -166,6 +168,7 @@ class Trepan(): # TODO: class hierarchy?
 
     Generator = namedtuple("Generator", ["generate", "training_idx"])
 
+    @total_ordering
     class Node(TreeNode):
 
         def __init__(self):
@@ -183,7 +186,17 @@ class Trepan(): # TODO: class hierarchy?
             self.coverage = None
             super().__init__()
 
-        # TODO: Add comparator
+        def __eq__(self, other):
+            if self.score is None or other.score is None:
+                return False
+            else:
+                return self.score == other.score
+        
+        def __lt__(self, other):
+            if self.score is None or other.score is None:
+                raise ValueError("Unable to compare nodes with uninitialized scores")
+            else:
+                return self.score < other.score
 
         def __str__(self):
 
@@ -228,7 +241,7 @@ class Trepan(): # TODO: class hierarchy?
             for i in range(self._d)]
 
         return Trepan.Generator(
-            generate = lambda: [f() for f in feature_generators],
+            generate = lambda: np.reshape([f() for f in feature_generators], (1, self._d)),
             training_idx = training_idx)
 
     def same_distribution(self, idx_1, idx_2):
@@ -313,7 +326,12 @@ class Trepan(): # TODO: class hierarchy?
         return result
 
     def split_score(self, split, data, targets):
-        raise NotImplementedError
+        """
+        Compute the split score (information gain) for a split.
+        """
+        return entropy(targets) - sum(map(
+            lambda c: entropy(targets[np.apply_along_axis(c.test, 1, data)]),
+            split))
 
     def construct_m_of_n_split(
         self,
@@ -383,10 +401,8 @@ class Trepan(): # TODO: class hierarchy?
         root.generator_training_idx = root.training_idx
 
         # Root node extra data
-        root.gen_data = self.draw_sample((), self.min_sample-n, root.generator)
-
-        # Classify extra data
-        root.gen_targets = self.oracle(root.gen_data)
+        root.gen_data, root.gen_targets = self.draw_sample(
+            (), self.min_sample-n, root.generator)
 
         # Estimate root's prediction
         root.prediction = mode(np.append(targets, root.gen_targets))
@@ -407,8 +423,8 @@ class Trepan(): # TODO: class hierarchy?
             node = heappop(heap)
             
             split = self.construct_split(
-                np.append(data[node.training_idxs], node.gen_data),
-                np.append(targets[node.training_idxs], node.gen_targets))
+                np.append(data[node.training_idx, :], node.gen_data, axis=0),
+                np.append(targets[node.training_idx], node.gen_targets))
             
             for constraint in split: # TODO: Continue from here
 
@@ -427,14 +443,11 @@ class Trepan(): # TODO: class hierarchy?
                 else:
                     child.generator = self.new_generator(child.training_idx)
 
-                # Generate data for child node
-                child.gen_data = self.draw_sample(
+                # Generate and classify data for child node
+                child.gen_data, child.gen_targets = self.draw_sample(
                     child.constraints,
                     self.min_sample-len(child.training_idx),
                     child.generator)
-
-                # Classify generated data
-                child.gen_targets = self.oracle(child.gen_data)
 
                 # Compute child's prediction
                 child.prediction = mode(np.append(targets[child.training_idx], child.gen_targets))
@@ -442,9 +455,15 @@ class Trepan(): # TODO: class hierarchy?
                 # Estimate child's fidelity
                 child.fidelity = np.mean(np.append(targets, child.gen_targets) == child.prediction)
 
+                n_gen = node.gen_data.shape[0]
+                if n_gen > 0:
+                    n_accepted = sum(np.apply_along_axis(constraint.test, 1, node.gen_data))
+                else:
+                    n_accepted = 0
+
                 child.coverage = \
-                    (len(child.training_idx) + sum(constraint.test(node.gen_data))) / \
-                    (len(node.training_idx) + len(node.gen_data)) * \
+                    (len(child.training_idx) + n_accepted) / \
+                    (len(node.training_idx) + n_gen) * \
                     node.coverage
                 
                 # Node score is the negative of:
@@ -460,13 +479,26 @@ class Trepan(): # TODO: class hierarchy?
     def draw_sample(self, constraints, n, generator):
         # Original implementation draws samples one at a time.
         # May be worth optimizing.
-        return [self.draw_instance(constraints, generator) for _ in range(max(0,n))]
+
+        logger.debug(f'Drawing sample of size {n}')
+
+        if n < 1:
+            return np.zeros((0, self._d)), np.array([])
+        else:
+            data = np.vstack(
+                [self.draw_instance(constraints, generator) for _ in range(n)])
+            targets = self.oracle(data)
+
+            logger.debug(f'Produced data shape {data.shape} and targets shape {targets.shape}')
+
+            return data, targets
 
     def draw_instance(self, constraints, generator, max_attempts = 100):
         
         for _ in range(max_attempts):
-            instance = generator()
-            if all([c.test(instance) for c in constraints]):
+            instance = generator.generate()
+            if all([c.test(instance.flatten()) for c in constraints]):
+                logger.debug(f'produced instance shape {instance.shape}')
                 return instance
         
         raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
