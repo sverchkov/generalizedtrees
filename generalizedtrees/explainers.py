@@ -358,7 +358,7 @@ class Trepan(): # TODO: class hierarchy?
             self.max_tree_size = max_tree_size
 
         self.data = data
-        _, self._d = np.shape(data)
+        _, self._d = np.shape(self.data)
 
         # TODO: Automatic inference of feature spec
         self.feature_spec = feature_spec
@@ -366,10 +366,10 @@ class Trepan(): # TODO: class hierarchy?
         self.oracle = oracle
 
         # Targets of training data
-        targets = self.oracle(data)
+        targets = self.oracle(self.data)
 
         # n is the number of samples
-        n: int = data.shape[0]
+        n: int = self.data.shape[0]
 
         # Init root node and tree
         root = Trepan.Node()
@@ -379,7 +379,7 @@ class Trepan(): # TODO: class hierarchy?
         root.training_idx = np.array(range(n))
 
         # Root node extra data generator
-        root.generator = self.new_generator(data)
+        root.generator = self.new_generator(root.training_idx)
         root.generator_training_idx = root.training_idx
 
         # Root node extra data
@@ -425,7 +425,7 @@ class Trepan(): # TODO: class hierarchy?
                 if self.same_distribution(child.training_idx, node.generator.training_idx):
                     child.generator = node.generator
                 else:
-                    child.generator = self.new_generator(data[child.training_idx])
+                    child.generator = self.new_generator(child.training_idx)
 
                 # Generate data for child node
                 child.gen_data = self.draw_sample(
