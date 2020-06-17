@@ -26,7 +26,7 @@ from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.sampling import rejection_sample_generator
 from generalizedtrees.scores import gini
 from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
-from generalizedtrees.tree import TreeNode, Tree
+from generalizedtrees.tree import TreeNode, Tree, tree_to_str
 from heapq import heappush, heappop
 from scipy.stats import mode, ks_2samp, chisquare
 from sklearn.base import ClassifierMixin
@@ -171,6 +171,7 @@ class Trepan(): # TODO: class hierarchy?
         def __init__(self):
             # TODO: Set types
             self.score = None
+            self.local_constraint = None
             self.constraints = None
             self.training_idx = None
             self.generator = None
@@ -183,6 +184,17 @@ class Trepan(): # TODO: class hierarchy?
             super().__init__()
 
         # TODO: Add comparator
+
+        def __str__(self):
+
+            if self.depth == 0:
+                return 'Root'
+
+            elif self.is_leaf:
+                return f'If {self.local_constraint} predict {self.prediction}'
+            
+            else:
+                return f'If {self.local_constraint}'
 
     def _feature_generator(self, data_vector, feature: FeatureSpec):
 
@@ -403,6 +415,7 @@ class Trepan(): # TODO: class hierarchy?
                 # Initialize a child node
                 child = Trepan.Node()
                 node.add_child(child)
+                child.local_constraint = constraint
                 child.constraints = node.constraints + (constraint,)
 
                 # Filter training data that gets to the child node
@@ -458,3 +471,25 @@ class Trepan(): # TODO: class hierarchy?
         
         raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
         # TODO: verify against page 50 of thesis
+    
+    def predict(self, data_matrix):
+        return(np.apply_along_axis(self._predict1, 1, data_matrix))
+
+    def _predict1(self, data_vector):
+
+        node = self.tree.root
+
+        while not node.is_leaf:
+            for child in node:
+                if child.local_constraint.test(data_vector):
+                    node = child
+                    break
+        
+        return(node.prediction)
+    
+    def show_tree(self):
+
+        if self.tree is None:
+            "Uninitialized Trepan model"
+
+        return(tree_to_str(self.tree))
