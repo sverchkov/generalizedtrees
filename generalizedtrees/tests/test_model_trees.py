@@ -19,8 +19,8 @@ from sklearn.utils.estimator_checks import check_estimator
 import pytest
 
 
-@pytest.mark.slow
-def test_decision_tree_with_sklearn():
+@pytest.mark.skip(reason="can't run this check on modeltree yet")
+def test_model_tree_with_sklearn():
     check_estimator(ModelTree)
 
 
@@ -29,4 +29,4 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=5)
 
-    test_decision_tree_with_sklearn()
+    test_model_tree_with_sklearn()
