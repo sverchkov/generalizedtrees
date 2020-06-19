@@ -19,7 +19,8 @@ import numpy as np
 from collections import namedtuple
 from functools import total_ordering
 from generalizedtrees import splitting
-from generalizedtrees.core import FeatureSpec, AbstractTreeEstimator, Node, ChildSelector
+from generalizedtrees.base.tree_estimator import TreeEstimatorMixin, TreeEstimatorNode
+from generalizedtrees.core import FeatureSpec
 from generalizedtrees.constraints import MofN
 from generalizedtrees.leaves import SimplePredictor
 from generalizedtrees.sampling import rejection_sample_generator
@@ -37,7 +38,64 @@ from typing import Tuple
 logger = logging.getLogger()
 
 
-class Trepan(): # TODO: class hierarchy?
+@total_ordering
+class TrepanNode(TreeEstimatorNode):
+
+    def __init__(self):
+        super().__init__()
+        # TODO: Set types
+        self.score = None
+        self.local_constraint = None
+        self.constraints = None
+        self.training_idx = None
+        self.generator = None
+        self.generator_src_node = None
+        self.gen_data = None
+        self.gen_targets = None
+        self.prediction = None
+        self.fidelity = None
+        self.coverage = None
+
+    def __eq__(self, other):
+        if self.score is None or other.score is None:
+            return False
+        else:
+            return self.score == other.score
+    
+    def __lt__(self, other):
+        if self.score is None or other.score is None:
+            raise ValueError("Unable to compare nodes with uninitialized scores")
+        else:
+            return self.score < other.score
+
+    def __str__(self):
+
+        if self.depth == 0:
+            return 'Root'
+
+        elif self.is_leaf:
+            return f'If {self.local_constraint} predict {self.prediction}'
+        
+        else:
+            return f'If {self.local_constraint}'
+    
+    def pick_branch(self, data_vector):
+    
+        for i in range(len(self)):
+            if self[i].local_constraint.test(data_vector):
+                return i
+        
+        logger.error(f"""\
+            Unable to pick branch for:
+            data vector: {data_vector}
+            node: {self}""")
+        raise ValueError
+
+    def predict(self, data_vector):
+        return self.prediction
+
+
+class Trepan(TreeEstimatorMixin):
     """
     Implementation of Trepan (Craven and Shavlik 1996)
 
@@ -60,7 +118,8 @@ class Trepan(): # TODO: class hierarchy?
         # Note: parameters passed to init sould define *how* the explanation tree is built
         # Note: init should declare all members
 
-        self.tree: Tree
+        super().__init__()
+
         self.data: np.ndarray
         self.oracle = None # f(x) -> y
         self.train_features = None # training set x (no y's)
@@ -78,47 +137,6 @@ class Trepan(): # TODO: class hierarchy?
         self.max_tree_size: int = max_tree_size
 
     Generator = namedtuple("Generator", ["generate", "training_idx"])
-
-    @total_ordering
-    class Node(TreeNode):
-
-        def __init__(self):
-            # TODO: Set types
-            self.score = None
-            self.local_constraint = None
-            self.constraints = None
-            self.training_idx = None
-            self.generator = None
-            self.generator_src_node = None
-            self.gen_data = None
-            self.gen_targets = None
-            self.prediction = None
-            self.fidelity = None
-            self.coverage = None
-            super().__init__()
-
-        def __eq__(self, other):
-            if self.score is None or other.score is None:
-                return False
-            else:
-                return self.score == other.score
-        
-        def __lt__(self, other):
-            if self.score is None or other.score is None:
-                raise ValueError("Unable to compare nodes with uninitialized scores")
-            else:
-                return self.score < other.score
-
-        def __str__(self):
-
-            if self.depth == 0:
-                return 'Root'
-
-            elif self.is_leaf:
-                return f'If {self.local_constraint} predict {self.prediction}'
-            
-            else:
-                return f'If {self.local_constraint}'
 
     def _feature_generator(self, data_vector, feature: FeatureSpec):
 
@@ -301,7 +319,7 @@ class Trepan(): # TODO: class hierarchy?
         n: int = self.data.shape[0]
 
         # Init root node and tree
-        root = Trepan.Node()
+        root = TrepanNode()
         self.tree = root.plant_tree()
 
         # Root uses all training data
@@ -340,7 +358,7 @@ class Trepan(): # TODO: class hierarchy?
             for constraint in split: # TODO: Continue from here
 
                 # Initialize a child node
-                child = Trepan.Node()
+                child = TrepanNode()
                 node.add_child(child)
                 child.local_constraint = constraint
                 child.constraints = node.constraints + (constraint,)
@@ -414,25 +432,3 @@ class Trepan(): # TODO: class hierarchy?
         
         raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
         # TODO: verify against page 50 of thesis
-    
-    def predict(self, data_matrix):
-        return(np.apply_along_axis(self._predict1, 1, data_matrix))
-
-    def _predict1(self, data_vector):
-
-        node = self.tree.root
-
-        while not node.is_leaf:
-            for child in node:
-                if child.local_constraint.test(data_vector):
-                    node = child
-                    break
-        
-        return(node.prediction)
-    
-    def show_tree(self):
-
-        if self.tree is None:
-            "Uninitialized Trepan model"
-
-        return(tree_to_str(self.tree))
