@@ -20,8 +20,6 @@ from collections import namedtuple
 from functools import total_ordering
 from generalizedtrees import splitting
 from generalizedtrees.base.tree_estimator import TreeEstimatorMixin, TreeEstimatorNode
-from generalizedtrees.base.tree_learner import TreeLearner
-from generalizedtrees.queues import Heap
 from generalizedtrees.core import FeatureSpec
 from generalizedtrees.constraints import MofN
 from generalizedtrees.leaves import SimplePredictor
@@ -97,7 +95,7 @@ class TrepanNode(TreeEstimatorNode):
         return self.prediction
 
 
-class Trepan(TreeLearner, TreeEstimatorMixin):
+class Trepan(TreeEstimatorMixin):
     """
     Implementation of Trepan (Craven and Shavlik 1996)
 
@@ -123,7 +121,6 @@ class Trepan(TreeLearner, TreeEstimatorMixin):
         super().__init__()
 
         self.data: np.ndarray
-        self.targets: np.ndarray
         self.oracle = None # f(x) -> y
         self.train_features = None # training set x (no y's)
         self.feature_spec: Tuple[FeatureSpec, ...] # Tuple of feature specs
@@ -316,10 +313,95 @@ class Trepan(TreeLearner, TreeEstimatorMixin):
         self.oracle = oracle
 
         # Targets of training data
-        self.targets = self.oracle(self.data)
+        targets = self.oracle(self.data)
 
-        # Build the tree
-        self._build()
+        # n is the number of samples
+        n: int = self.data.shape[0]
+
+        # Init root node and tree
+        root = TrepanNode()
+        self.tree = root.plant_tree()
+
+        # Root uses all training data
+        root.training_idx = np.array(range(n))
+
+        # Root node extra data generator
+        root.generator = self.new_generator(root.training_idx)
+        root.generator_training_idx = root.training_idx
+
+        # Root node extra data
+        root.gen_data, root.gen_targets = self.draw_sample(
+            (), self.min_sample-n, root.generator)
+
+        # Estimate root's prediction
+        root.prediction = mode(np.append(targets, root.gen_targets))
+
+        # Estimate root's fidelity
+        root.fidelity = np.mean(np.append(targets, root.gen_targets) == root.prediction)
+
+        # Other housekeeping
+        root.coverage = 1
+        root.score = 0
+        root.constraints = ()
+
+        # Insert into heap
+        heap = [root]
+
+        while heap and self.tree.size < self.max_tree_size:
+
+            node = heappop(heap)
+            
+            split = self.construct_split(
+                np.append(data[node.training_idx, :], node.gen_data, axis=0),
+                np.append(targets[node.training_idx], node.gen_targets))
+            
+            for constraint in split: # TODO: Continue from here
+
+                # Initialize a child node
+                child = TrepanNode()
+                node.add_child(child)
+                child.local_constraint = constraint
+                child.constraints = node.constraints + (constraint,)
+
+                # Filter training data that gets to the child node
+                child.training_idx = [i for i in node.training_idx if constraint.test(data[i])]
+
+                # Re-estimate generator at child node
+                if self.same_distribution(child.training_idx, node.generator.training_idx):
+                    child.generator = node.generator
+                else:
+                    child.generator = self.new_generator(child.training_idx)
+
+                # Generate and classify data for child node
+                child.gen_data, child.gen_targets = self.draw_sample(
+                    child.constraints,
+                    self.min_sample-len(child.training_idx),
+                    child.generator)
+
+                # Compute child's prediction
+                child.prediction = mode(np.append(targets[child.training_idx], child.gen_targets))
+
+                # Estimate child's fidelity
+                child.fidelity = np.mean(np.append(targets, child.gen_targets) == child.prediction)
+
+                n_gen = node.gen_data.shape[0]
+                if n_gen > 0:
+                    n_accepted = sum(np.apply_along_axis(constraint.test, 1, node.gen_data))
+                else:
+                    n_accepted = 0
+
+                child.coverage = \
+                    (len(child.training_idx) + n_accepted) / \
+                    (len(node.training_idx) + n_gen) * \
+                    node.coverage
+                
+                # Node score is the negative of:
+                #   f(N) = reach(N) (1-fidelity(N))
+                child.score = -(child.coverage * (1 - child.fidelity))
+                
+                # TODO: local stopping criteria
+                if not all( targets[child.training_idx] == child.prediction):
+                    heappush(heap, child)
 
         return self
 
@@ -350,73 +432,3 @@ class Trepan(TreeLearner, TreeEstimatorMixin):
         
         raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
         # TODO: verify against page 50 of thesis
-
-    def new_node(self, branch = None, parent = None):
-
-        # For Trepan, branches are just constraint objects.
-
-        node = TrepanNode()
-
-        if branch is not None and parent is not None:
-
-            node.local_constraint = branch
-            node.constraints = parent.constraints + (node.local_constraint,)
-
-            # Filter training data that gets to the node
-            node.training_idx = [
-                i for i in parent.training_idx
-                if node.local_constraint.test(self.data[i])]
-        
-        else:
-            node.constraints = ()
-            node.training_idx = list(range(self.data.shape[0]))
-            
-        # Re-estimate generator at node
-        if parent is not None and self.same_distribution(node.training_idx, parent.generator.training_idx):
-            node.generator = parent.generator
-        else:
-            node.generator = self.new_generator(node.training_idx)
-
-        # Generate and classify data for node
-        node.gen_data, node.gen_targets = self.draw_sample(
-            node.constraints,
-            self.min_sample-len(node.training_idx),
-            node.generator)
-
-        # Compute node's prediction
-        node.prediction = mode(np.append(self.targets[node.training_idx], node.gen_targets))
-
-        # Estimate node's fidelity
-        node.fidelity = np.mean(np.append(self.targets, node.gen_targets) == node.prediction)
-
-        # Estimate node's reach
-        if branch is not None and parent is not None:
-            n_gen = parent.gen_data.shape[0]
-            if n_gen > 0:
-                n_accepted = sum(np.apply_along_axis(node.local_constraint.test, 1, parent.gen_data))
-            else:
-                n_accepted = 0
-
-            node.coverage = \
-                (len(node.training_idx) + n_accepted) / \
-                (len(parent.training_idx) + n_gen) * \
-                parent.coverage
-        
-        else:
-            node.coverage = 1
-
-        # Node score is the negative of:
-        #   f(N) = reach(N) (1-fidelity(N))
-        node.score = -(node.coverage * (1 - node.fidelity))
-
-        return node
-
-    def new_queue(self):
-        return Heap()
-
-    def global_stop(self):
-        return self.tree.size >= self.max_tree_size
-
-    def local_stop(self, node):
-        return not all( self.targets[node.training_idx] == node.prediction)
-
