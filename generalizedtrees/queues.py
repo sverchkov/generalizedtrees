@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from heapq import heappush, heappop
+from collections import deque
 
 class Heap(list):
 
@@ -23,3 +24,16 @@ class Heap(list):
     
     def pop(self):
         return heappop(self)
+
+class Stack(deque):
+
+    def push(self, item):
+        self.append(item)
+
+class Queue(Stack):
+
+    def pop(self):
+        return super().popleft()
+    
+    def popright(self):
+        return super().pop()
