@@ -222,7 +222,7 @@ class Trepan(TreeLearner, TreeEstimatorMixin):
     def construct_split(self, node: TrepanNode):
         data = np.append(self.data[node.training_idx, :], node.gen_data, axis=0)
         targets = np.append(self.targets[node.training_idx], node.gen_targets)
-        
+
         split_candidates = self.make_split_candidates(data, targets)
         best_split = ()
         best_split_score = 0
@@ -421,5 +421,5 @@ class Trepan(TreeLearner, TreeEstimatorMixin):
         return self.tree.size >= self.max_tree_size
 
     def local_stop(self, node):
-        return not all( self.targets[node.training_idx] == node.prediction)
+        return all( self.targets[node.training_idx] == node.prediction)
 
