@@ -34,7 +34,7 @@ setup(
     license="Apache 2",
     keywords="machine learning decision trees model",
     url="https://github.com/Craven-Biostat-Lab/generalizedtrees",
-    packages=['generalizedtrees'],
+    packages=find_packages(exclude=['*.tests']),
     install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
