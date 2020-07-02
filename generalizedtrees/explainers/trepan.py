@@ -219,7 +219,10 @@ class Trepan(TreeLearner, TreeEstimatorMixin):
 
         return min_p < self.dist_test_alpha/n_tests
 
-    def construct_split(self, data, targets):
+    def construct_split(self, node: TrepanNode):
+        data = np.append(self.data[node.training_idx, :], node.gen_data, axis=0)
+        targets = np.append(self.targets[node.training_idx], node.gen_targets)
+        
         split_candidates = self.make_split_candidates(data, targets)
         best_split = ()
         best_split_score = 0
