@@ -1,6 +1,6 @@
-# Tests for standard trees
+# Our implementation of standard decision tree classifiers
 #
-# Copyright 2019 Yuriy Sverchkov
+# Copyright 2020 Yuriy Sverchkov
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,19 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.deprecated.standard_trees import ModelTree
-from sklearn.utils.estimator_checks import check_estimator
-import pytest
+from generalizedtrees.composing import compose_greedy_learner
+from generalizedtrees.base import TreeBuilder
 
-
-@pytest.mark.skip(reason="can't run this check on modeltree yet")
-def test_model_tree_with_sklearn():
-    check_estimator(ModelTree)
-
-
-if __name__ == "__main__":
-    import logging
-    logger = logging.getLogger(__name__)
-    logging.basicConfig(level=5)
-
-    test_model_tree_with_sklearn()
+DecisionTreeClassifier = compose_greedy_learner(
+    name="DecisionTreeClassifier",
+    splitting_strategy={
+        discrete: one_vs_all,
+        continuous: fayyad_binary_split},
+    fitting=test_set
+)

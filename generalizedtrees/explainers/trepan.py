@@ -19,8 +19,7 @@ import numpy as np
 from collections import namedtuple
 from functools import total_ordering
 from generalizedtrees import splitting
-from generalizedtrees.base.tree_estimator import TreeEstimatorMixin, TreeEstimatorNode
-from generalizedtrees.base.tree_learner import TreeLearner
+from generalizedtrees.base import TreeEstimatorMixin, TreeEstimatorNode, TreeBuilder
 from generalizedtrees.queues import Heap
 from generalizedtrees.core import FeatureSpec
 from generalizedtrees.constraints import MofN
@@ -97,7 +96,7 @@ class TrepanNode(TreeEstimatorNode):
         return self.prediction
 
 
-class Trepan(TreeLearner, TreeEstimatorMixin):
+class Trepan(TreeBuilder, TreeEstimatorMixin):
     """
     Implementation of Trepan (Craven and Shavlik 1996)
 

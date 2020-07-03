@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.standard_trees import DecisionTreeClassifier
+from generalizedtrees.deprecated.standard_trees import DecisionTreeClassifier
 from sklearn.utils.estimator_checks import check_estimator
 import pytest
 

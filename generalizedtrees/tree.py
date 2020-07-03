@@ -86,7 +86,7 @@ class TreeNode:
 class Tree:
     """
     A container-like tree data structure.
-    Alwatys meant to be initialized with a tree node.
+    Always meant to be initialized with a tree node.
     """
 
     def __init__(self, node: TreeNode):

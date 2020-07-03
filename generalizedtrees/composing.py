@@ -1,6 +1,6 @@
-# Tests for standard trees
+# Utility for composing tree learners out of building blocks
 #
-# Copyright 2019 Yuriy Sverchkov
+# Copyright 2020 Yuriy Sverchkov
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,19 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.deprecated.standard_trees import ModelTree
-from sklearn.utils.estimator_checks import check_estimator
-import pytest
+from typing import Type
+from generalizedtrees.base import TreeBuilder, TreeEstimatorMixin
 
 
-@pytest.mark.skip(reason="can't run this check on modeltree yet")
-def test_model_tree_with_sklearn():
-    check_estimator(ModelTree)
+def compose_greedy_learner(
+    name: str,
+    global_stop,
+    local_stop
+    ):
 
+    bases = (TreeBuilder, TreeEstimatorMixin)
 
-if __name__ == "__main__":
-    import logging
-    logger = logging.getLogger(__name__)
-    logging.basicConfig(level=5)
+    members = dict(
+        new_node=None,
+        new_queue=None,
+        construct_split=None,
+        global_stop=None,
+        local_stop=None
+    )
 
-    test_model_tree_with_sklearn()
+    return type(name=name, bases=bases, dict=members)
