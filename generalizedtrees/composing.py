@@ -14,24 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Type
+from typing import Type, Any
 from generalizedtrees.base import TreeBuilder, TreeEstimatorMixin
 
 
 def compose_greedy_learner(
     name: str,
-    global_stop,
-    local_stop
+    fitter, # Fit function
+    splitter: Type[Any], # Splitter class
+    queue: Type[Any], # Queue class
+    global_stop, # function of model
+    local_stop # function of model, node
     ):
 
-    bases = (TreeBuilder, TreeEstimatorMixin)
+    bases = (TreeBuilder, TreeEstimatorMixin, splitter)
 
     members = dict(
-        new_node=None,
-        new_queue=None,
-        construct_split=None,
-        global_stop=None,
-        local_stop=None
+        fit=fitter,
+        new_queue=queue,
+        global_stop=global_stop,
+        local_stop=local_stop
     )
 
     return type(name=name, bases=bases, dict=members)

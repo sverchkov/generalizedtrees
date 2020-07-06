@@ -21,6 +21,11 @@ import numpy as np
 
 
 class TreeModel:
+    """
+    Base class for tree models.
+
+    Just ensures the presence of a tree member.
+    """
 
     def __init__(self):
         self.tree: Optional[Tree] = None
@@ -31,6 +36,21 @@ class TreeModel:
             "Uninitialized tree model"
 
         return(tree_to_str(self.tree))
+
+
+class AbstractTreeBuilder(ABC):
+    """
+    Abstract class for tree builders.
+
+    Mostly used for type annotations.
+    """
+
+    @abstractmethod
+    def _build(self):
+        pass
+
+    def prune(self): # Note: not abstract; no-op is a default pruning strategy
+        pass
 
 
 class TreeBuilder(ABC, TreeModel):
@@ -98,7 +118,7 @@ class TreeEstimatorNode(ABC, TreeNode):
 
 class TreeEstimatorMixin(TreeModel):
     """
-    The tree estimator mixin defines the logic of producitg a prediction using
+    The tree estimator mixin defines the logic of producing a prediction using
     a decision tree.
     
     It should be used with a tree 'planted' from a subclass of
