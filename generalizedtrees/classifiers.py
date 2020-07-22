@@ -14,17 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import field
 from generalizedtrees.composing import compose_greedy_learner
 from generalizedtrees.base import TreeBuilder
 from generalizedtrees.fitters import supervised_data_fit
-from generalizedtrees.splitters import SupervisedScoreSplitter
+from generalizedtrees.splitters import construct_supervised_learner_split, make_supervised_learner_node
 from generalizedtrees.queues import Stack
 from generalizedtrees.stopping import tree_size_limit, perfect_classification
 
 DecisionTreeClassifier = compose_greedy_learner(
     name="DecisionTreeClassifier",
+    parameters=[
+        ('max_tree_size', int, field(default=20))
+    ],
     fitter=supervised_data_fit,
-    splitter=SupervisedScoreSplitter,
+    construct_split=construct_supervised_learner_split,
+    new_node=make_supervised_learner_node,
     queue=Stack,
     global_stop=tree_size_limit,
     local_stop=perfect_classification

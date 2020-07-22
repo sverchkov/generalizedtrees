@@ -14,10 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Tuple
 from generalizedtrees.base import AbstractTreeBuilder
+from generalizedtrees.core import FeatureSpec
 from numpy import ndarray
 
-def supervised_data_fit(tree_builder: AbstractTreeBuilder, data: ndarray, targets: ndarray, **kwargs):
+def supervised_data_fit(
+    tree_builder: AbstractTreeBuilder,
+    data: ndarray,
+    targets: ndarray,
+    feature_spec: Tuple[FeatureSpec],
+    **kwargs):
 
     # TODO: Handle kwargs
 
@@ -25,6 +32,7 @@ def supervised_data_fit(tree_builder: AbstractTreeBuilder, data: ndarray, target
 
     tree_builder.data = data
     tree_builder.targets = targets
+    tree_builder.feature_spec = feature_spec
 
     tree_builder._build()
     tree_builder.prune()

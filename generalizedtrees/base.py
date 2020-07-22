@@ -53,7 +53,7 @@ class AbstractTreeBuilder(ABC):
         pass
 
 
-class TreeBuilder(ABC, TreeModel):
+class TreeBuilder(AbstractTreeBuilder, TreeModel):
     """
     Greedy tree building strategy
     """
@@ -99,7 +99,7 @@ class TreeBuilder(ABC, TreeModel):
         pass
 
 
-class TreeEstimatorNode(ABC, TreeNode):
+class TreeEstimatorNode(ABC, TreeNode): #TODO: Review need.
     """
     Base abstract class for decision tree nodes.
 

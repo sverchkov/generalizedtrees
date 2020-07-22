@@ -15,25 +15,30 @@
 # limitations under the License.
 
 from typing import Type, Any
+from dataclasses import make_dataclass
 from generalizedtrees.base import TreeBuilder, TreeEstimatorMixin
 
 
 def compose_greedy_learner(
     name: str,
+    parameters, # As in dataclass
     fitter, # Fit function
-    splitter: Type[Any], # Splitter class
+    construct_split, # Function
+    new_node, # Function
     queue: Type[Any], # Queue class
     global_stop, # function of model
     local_stop # function of model, node
     ):
 
-    bases = (TreeBuilder, TreeEstimatorMixin, splitter)
+    C = make_dataclass('C', fields=parameters, bases=(TreeBuilder, TreeEstimatorMixin))
 
     members = dict(
         fit=fitter,
         new_queue=queue,
+        construct_split = construct_split,
+        new_node = new_node,
         global_stop=global_stop,
         local_stop=local_stop
     )
 
-    return type(name=name, bases=bases, dict=members)
+    return type(name, (C,), members)

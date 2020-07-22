@@ -19,73 +19,102 @@ from generalizedtrees.base import TreeEstimatorNode
 from generalizedtrees.core import FeatureSpec
 from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
 from generalizedtrees.scores import entropy
+from functools import cached_property
+from statistics import mode
 from typing import List
 import numpy as np
+from logging import getLogger
 
+logger = getLogger()
 
-class SupervisedScoreSplitter:
+class SupervisedLearnerNode(TreeEstimatorNode):
 
-    def __init__(self):
-        super.__init__()
-        self.data: np.ndarray
-        self.targets: np.ndarray
-        self.feature_spec: List[FeatureSpec]
+    def __init__(self, data, targets):
+        super().__init__()
+        self.src_data = data
+        self.src_targets = targets
+        self.branch = None
+        self.idx = None
+    
+    @property
+    def data(self):
+        return self.src_data[self.idx, :]
+    
+    @property
+    def targets(self):
+        return self.src_targets[self.idx]
 
-    class Node(TreeEstimatorNode):
+    @cached_property
+    def prediction(self):
+        return mode(self.targets)
+    
+    def predict(self, data_vector):
+        return self.prediction
 
-        def __init__(self):
-            super().__init__()
-            self.training_idx = None
-
-    def new_node(self, branch=None, parent=None):
-
-        node = SupervisedScoreSplitter.Node
-
-        if branch is None or parent is None:
-            node.training_idx = list(range(self.data.shape[0]))
+    def pick_branch(self, data_vector):
+    
+        for i in range(len(self)):
+            if self[i].branch.test(data_vector):
+                return i
         
+        logger.error(f"""\
+            Unable to pick branch for:
+            data vector: {data_vector}
+            node: {self}""")
+        raise ValueError
+
+def make_supervised_learner_node(tree_model, branch=None, parent=None):
+
+    node = SupervisedLearnerNode(tree_model.data, tree_model.targets)
+
+    if branch is None or parent is None:
+        node.idx = list(range(node.src_data.shape[0]))
+    else:
+        node.idx = [idx for idx in parent.idx if branch.test(node.src_data[idx, :])]
+        node.branch = branch
+        
+    return node
+
+def construct_supervised_learner_split(tree_model, node: SupervisedLearnerNode):
+    data = node.data
+    targets = node.targets
+    feature_spec = tree_model.feature_spec
+
+    split_candidates = make_split_candidates(feature_spec, data, targets)
+    best_split = ()
+    best_split_score = 0
+    for split in split_candidates:
+        new_score = information_gain(split, data, targets)
+        if new_score > best_split_score:
+            best_split_score = new_score
+            best_split = split
+    
+    return best_split
+
+def make_split_candidates(feature_spec, data, targets):
+    # Note: we could make splits based on original training examples only, or on
+    # training examples and generated examples.
+    # In the current form, this could be controlled by the calling function.
+
+    result = []
+
+    for j in range(len(feature_spec)):
+        if feature_spec[j] is FeatureSpec.CONTINUOUS:
+            result.extend(fayyad_thresholds(data, targets, j))
+        elif feature_spec[j] & FeatureSpec.DISCRETE:
+            result.extend(one_vs_all(data, j))
         else:
-            node.training_idx = [idx for idx in parent.training_idx if branch.test(self.data[idx, :])]
-        
-        return node
+            raise ValueError(f"I don't know how to handle feature spec {feature_spec[j]}")
+    
+    return result
 
-    def construct_split(self, node: SupervisedScoreSplitter.Node):
-        data = self.data[node.training_idx, :]
-        targets = self.targets[node.training_idx]
+def information_gain(split, data, targets):
+    """
+    Compute the split score (information gain) for a split.
 
-        split_candidates = self.make_split_candidates(data, targets)
-        best_split = ()
-        best_split_score = 0
-        for split in split_candidates:
-            new_score = self.split_score(split, data, targets)
-            if new_score > best_split_score:
-                best_split_score = new_score
-                best_split = split
-        
-        return best_split
-
-    def make_split_candidates(self, data, targets):
-        # Note: we could make splits based on original training examples only, or on
-        # training examples and generated examples.
-        # In the current form, this could be controlled by the calling function.
-
-        result = []
-
-        for j in range(len(self.feature_spec)):
-            if self.feature_spec[j] is FeatureSpec.CONTINUOUS:
-                result.extend(fayyad_thresholds(data, targets, j))
-            elif self.feature_spec[j] & FeatureSpec.DISCRETE:
-                result.extend(one_vs_all(data, j))
-            else:
-                raise ValueError(f"I don't know how to handle feature spec {self.feature_spec[j]}")
-        
-        return result
-
-    def split_score(self, split, data, targets):
-        """
-        Compute the split score (information gain) for a split.
-        """
-        return entropy(targets) - sum(map(
-            lambda c: entropy(targets[np.apply_along_axis(c.test, 1, data)]),
-            split))
+    A split is a tuple of constraints.
+    """
+    return entropy(targets) - sum(map(
+        lambda c: entropy(targets[np.apply_along_axis(c.test, 1, data)]),
+        split))
 
