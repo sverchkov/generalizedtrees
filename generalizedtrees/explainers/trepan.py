@@ -16,6 +16,7 @@
 
 import logging
 import numpy as np
+import pandas as pd
 from collections import namedtuple
 from functools import total_ordering
 from generalizedtrees import splitting
@@ -33,7 +34,7 @@ from scipy.stats import mode, ks_2samp, chisquare
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KernelDensity
 from statistics import mode
-from typing import Tuple
+from typing import Tuple, Optional
 
 
 logger = logging.getLogger()
@@ -53,7 +54,7 @@ class TrepanNode(TreeEstimatorNode):
         self.generator_src_node = None
         self.gen_data = None
         self.gen_targets = None
-        self.prediction = None
+        self.prediction_proba: pd.Series
         self.fidelity = None
         self.coverage = None
 
@@ -75,7 +76,8 @@ class TrepanNode(TreeEstimatorNode):
             return 'Root'
 
         elif self.is_leaf:
-            return f'If {self.local_constraint} predict {self.prediction}'
+
+            return f'If {self.local_constraint} predict {dict(self.prediction_proba)}'
         
         else:
             return f'If {self.local_constraint}'
@@ -93,7 +95,7 @@ class TrepanNode(TreeEstimatorNode):
         raise ValueError
 
     def predict(self, data_vector):
-        return self.prediction
+        return self.prediction_proba.idxmax()
 
 
 class Trepan(TreeBuilder, TreeEstimatorMixin):
@@ -123,6 +125,7 @@ class Trepan(TreeBuilder, TreeEstimatorMixin):
 
         self.data: np.ndarray
         self.targets: np.ndarray
+        self.oracle_gives_probabilities: bool
         self.oracle = None # f(x) -> y
         self.train_features = None # training set x (no y's)
         self.feature_spec: Tuple[FeatureSpec, ...] # Tuple of feature specs
@@ -303,7 +306,13 @@ class Trepan(TreeBuilder, TreeEstimatorMixin):
     def tests_sig_diff(self, split, new_split):
         raise NotImplementedError
 
-    def fit(self, data, oracle, feature_spec: Tuple[FeatureSpec, ...], max_tree_size = None):
+    def fit(
+        self,
+        data,
+        oracle,
+        feature_spec: Tuple[FeatureSpec, ...],
+        oracle_gives_probabilities: bool = False,
+        max_tree_size: Optional[int] = None):
         # Note: parameters passed to fit should represent problem-specific details
         # Max tree size can be seen as problem-specific, so we include it here too.
         if max_tree_size is not None:
@@ -317,8 +326,13 @@ class Trepan(TreeBuilder, TreeEstimatorMixin):
 
         self.oracle = oracle
 
+        self.oracle_gives_probabilities = oracle_gives_probabilities
+
         # Targets of training data
-        self.targets = self.oracle(self.data)
+        if oracle_gives_probabilities:
+            self.targets = pd.DataFrame(self.oracle(self.data))
+        else:
+            self.targets = pd.Series(self.oracle(self.data))
 
         # Build the tree
         self._build()
@@ -385,11 +399,20 @@ class Trepan(TreeBuilder, TreeEstimatorMixin):
             self.min_sample-len(node.training_idx),
             node.generator)
 
-        # Compute node's prediction
-        node.prediction = mode(np.append(self.targets[node.training_idx], node.gen_targets))
+        # Compute node's prediction and estimate fidelity
+        if (self.oracle_gives_probabilities):
+            raise NotImplementedError()
+            #node.prediction_proba = average of rows
+        else:
+            # Compute prediction
+            targets = np.append(self.targets[node.training_idx], node.gen_targets)
+            unique, counts = np.unique(targets,
+                return_counts=True)
+            total = sum(counts)
+            node.prediction_proba = pd.Series(data=counts/total, index=unique)
 
-        # Estimate node's fidelity
-        node.fidelity = np.mean(np.append(self.targets, node.gen_targets) == node.prediction)
+            # Estimate fidelity
+            node.fidelity = np.mean(node.prediction_proba[targets])
 
         # Estimate node's reach
         if branch is not None and parent is not None:
@@ -420,5 +443,5 @@ class Trepan(TreeBuilder, TreeEstimatorMixin):
         return self.tree.size >= self.max_tree_size
 
     def local_stop(self, node):
-        return all( self.targets[node.training_idx] == node.prediction)
+        return node.fidelity <= 1
 
