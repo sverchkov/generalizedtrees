@@ -101,7 +101,7 @@ def make_trepanlike_classifier(
 
                 best_score = self.score(targets)
 
-                for feature in range(features.shape[2]):
+                for feature in range(features.shape[1]):
 
                     for branches in splitting_strategies(feature, features):
 
