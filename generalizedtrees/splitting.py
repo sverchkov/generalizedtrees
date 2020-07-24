@@ -16,10 +16,59 @@
 
 import logging
 import numpy as np
+from functools import cached_property
+from generalizedtrees.base import SplitTest
 from generalizedtrees.constraints import LEQConstraint, GTConstraint, EQConstraint, NEQConstraint
 
 logger = logging.getLogger()
 
+# Split classes
+class SplitGT(SplitTest):
+
+    def __init__(self, feature, value):
+        self.feature = feature
+        self.value = value
+    
+    def pick_branches(self, data_matrix):
+        return (data_matrix[:, self.feature] > self.value).astype(np.intp)
+
+    @cached_property
+    def constraints(self):
+        return (
+            LEQConstraint(self.feature, self.value),
+            GTConstraint(self.feature, self.value))
+
+
+class SplitOneVsAll(SplitTest):
+
+    def __init__(self, feature, value):
+        self.feature = feature
+        self.value = value
+    
+    def pick_branches(self, data_matrix):
+        return (data_matrix[:, self.feature] == self.value).astype(np.intp)
+
+    @cached_property
+    def constraints(self):
+        return (
+            NEQConstraint(self.feature, self.value),
+            EQConstraint(self.feature, self.value))
+
+
+class SplitEveryValue(SplitTest):
+
+    def __init__(self, feature, values):
+        self.feature = feature
+        self.values = values
+    
+    def pick_branches(self, data_matrix):
+        return None
+
+    @cached_property
+    def constraints(self):
+        return (EQConstraint(self.feature, v) for v in self.values)
+
+# Test generators
 
 def fayyad_thresholds(data, target, feature):
     """
@@ -47,7 +96,7 @@ def fayyad_thresholds(data, target, feature):
             # Only place splits between distinct y-values
             if y_collision or y_prev != y:
                 split_point = (x_prev + x)/2
-                yield (LEQConstraint(feature, split_point), GTConstraint(feature, split_point))
+                yield SplitGT(feature, split_point)
             # Reset collision flag when advancing in x-space
             y_collision = False
         else:
@@ -63,16 +112,24 @@ def one_vs_all(data, feature):
     :param feature: Index of splitting feature (integer >=0 and <d)
     """
     for x in np.unique(data[:,feature]):
-        yield [EQConstraint(feature, x), NEQConstraint(feature, x)]
+        yield SplitOneVsAll(feature, x)
 
 
 def binary_threshold(data, feature):
+    """
+    Deprecated
+    """
     for x_i in data:
         yield [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
 
 
 def all_values_split(feature, values):
-    yield [EQConstraint(feature, value) for value in values]
+    """
+    Generator for all-value splits.
+    :param feature: Feature index
+    :param values: List of possible feature values
+    """
+    yield SplitEveryValue(feature, values)
 
 
 def compose_splitting_strategies(spec_list):

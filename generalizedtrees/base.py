@@ -16,7 +16,7 @@
 
 from abc import ABC, abstractmethod
 from generalizedtrees.tree import tree_to_str, Tree, TreeNode
-from typing import Optional
+from typing import Optional, Tuple
 import numpy as np
 
 
@@ -99,48 +99,72 @@ class TreeBuilder(AbstractTreeBuilder, TreeModel):
         pass
 
 
-class TreeEstimatorNode(ABC, TreeNode): #TODO: Review need.
+class SplitTest(ABC):
     """
-    Base abstract class for decision tree nodes.
+    Base abstract class for splits.
 
-    Formalizes the need to implement pick_branch and predict for use in tree
-    estimators.
+    A split is defined as a test with integer outcomes and a set of constraints each of which
+    corresponds to an outcome of the test.
     """
 
     @abstractmethod
-    def pick_branch(self, data_vector: np.ndarray) -> int:
+    def pick_branches(self, data_matrix):
         pass
 
+    @property
     @abstractmethod
-    def predict(self, data_vector: np.ndarray):
+    def constraints(self):
         pass
 
 
-class TreeEstimatorMixin(TreeModel):
+class ClassificationTreeNode(TreeNode):
+
+    def node_proba(self, data_matrix):
+        raise NotImplementedError
+
+    @property
+    def split(self) -> Optional[SplitTest]:
+        return None
+
+    def _predict_subtree_proba(self, data_matrix, idx, result):
+
+        if self.is_leaf:
+            result[idx,:] = self.node_proba(data_matrix[idx,])
+        
+        else:
+            branches = self.split.pick_branches(data_matrix[idx,])
+            for b in np.unique(branches):
+                self[b]._predict_subtree_proba(data_matrix, idx[branches==b], result)
+
+        return result
+
+
+class TreeClassifierMixin(TreeModel):
     """
-    The tree estimator mixin defines the logic of producing a prediction using
+    The tree classifier mixin defines the logic of producing a classification using
     a decision tree.
     
-    It should be used with a tree 'planted' from a subclass of
-    TreeEstimatorNode.
-    The subclass of TreeEstimatorNode is where pick_branch (for internal nodes)
-    and predict (for leaves) are defined.
-
-    The decision logic is to follow branches (governed by pick_branch) and
-    produce the decision at the leaves (governed by TreeEstimatorNode.predict).
+    The tree (self.tree) should be used with a tree 'planted' from a subclass of
+    ClassificationTreeNode, or something that monkeys it. That is where actual branching
+    logic and prediction happens.
+    The prediction functions also require a `target_classes` field to be defined.
     """
 
-    def predict(self, data_matrix):
-        return(np.apply_along_axis(self._predict1, 1, data_matrix))
-
-    def _predict1(self, data_vector):
+    def predict_proba(self, data_matrix):
 
         if self.tree is None:
             raise ValueError("Attempted to predict without an initialized tree.")
 
-        node = self.tree.root
+        n = data_matrix.shape[0]
+        k = len(self.target_classes)
 
-        while not node.is_leaf:
-            node = node[node.pick_branch(data_vector)]
-        
-        return(node.predict(data_vector))
+        result = np.empty((n, k), dtype=np.float)
+
+        return self.tree.root._predict_subtree_proba(
+            data_matrix,
+            np.arange(n, dtype=np.intp),
+            result)
+
+    def predict(self, data_matrix):
+
+        return self.target_classes[self.predict_proba(data_matrix).argmax(axis=1)]
