@@ -23,16 +23,6 @@ from generalizedtrees.constraints import LEQConstraint, GTConstraint, EQConstrai
 logger = logging.getLogger()
 
 # Split classes
-class NullSplit(SplitTest):
-
-    def pick_branches(self, data_matrix):
-        raise ValueError("Null split has no branches")
-
-    @property
-    def constraints(self):
-        return ()
-
-null_split = NullSplit()
 
 class SplitGT(SplitTest):
 
@@ -48,6 +38,9 @@ class SplitGT(SplitTest):
         return (
             LEQConstraint(self.feature, self.value),
             GTConstraint(self.feature, self.value))
+    
+    def __str__(self):
+        return f'Test x[{self.feature}] > {self.value}'
 
 
 class SplitOneVsAll(SplitTest):
@@ -65,6 +58,9 @@ class SplitOneVsAll(SplitTest):
             NEQConstraint(self.feature, self.value),
             EQConstraint(self.feature, self.value))
 
+    def __str__(self):
+        return f'Test x[{self.feature}] == {self.value}'
+
 
 class SplitEveryValue(SplitTest):
 
@@ -78,6 +74,10 @@ class SplitEveryValue(SplitTest):
     @cached_property
     def constraints(self):
         return (EQConstraint(self.feature, v) for v in self.values)
+
+    def __str__(self):
+        return f'Test x[{self.feature}] against each of {self.values}'
+
 
 # Test generators
 

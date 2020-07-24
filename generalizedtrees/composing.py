@@ -23,8 +23,9 @@ def compose_greedy_learner(
     name: str,
     parameters, # As in dataclass
     fitter, # Fit function
+    create_root, # Function
     construct_split, # Function
-    new_node, # Function
+    generate_children, # Function
     queue: Type[Any], # Queue class
     global_stop, # function of model
     local_stop # function of model, node
@@ -35,8 +36,9 @@ def compose_greedy_learner(
     members = dict(
         fit=fitter,
         new_queue=queue,
-        construct_split = construct_split,
-        new_node = new_node,
+        create_root=create_root,
+        construct_split=construct_split,
+        generate_children=generate_children,
         global_stop=global_stop,
         local_stop=local_stop
     )

@@ -18,19 +18,23 @@ from dataclasses import field
 from generalizedtrees.composing import compose_greedy_learner
 from generalizedtrees.base import TreeBuilder
 from generalizedtrees.fitters import supervised_data_fit
-from generalizedtrees.splitters import construct_supervised_classifier_split, make_supervised_classifier_node
+from generalizedtrees.splitters import \
+    construct_supervised_classifier_split,\
+    make_supervised_classifier_root,\
+    generate_supervised_classifier_children
 from generalizedtrees.queues import Stack
-from generalizedtrees.stopping import tree_size_limit, perfect_classification
+from generalizedtrees.stopping import never, node_depth
 
 DecisionTreeClassifier = compose_greedy_learner(
     name="DecisionTreeClassifier",
     parameters=[
-        ('max_tree_size', int, field(default=20))
+        ('max_depth', int, field(default=10))
     ],
     fitter=supervised_data_fit,
+    create_root=make_supervised_classifier_root,
     construct_split=construct_supervised_classifier_split,
-    new_node=make_supervised_classifier_node,
+    generate_children=generate_supervised_classifier_children,
     queue=Stack,
-    global_stop=tree_size_limit,
-    local_stop=perfect_classification
+    global_stop=never,
+    local_stop=node_depth
 )

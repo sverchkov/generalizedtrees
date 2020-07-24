@@ -15,25 +15,62 @@
 # limitations under the License.
 
 import pytest
+from numpy.testing import assert_allclose
 
 def test_composed_dtc(breast_cancer_data, caplog):
 
     import logging
     from generalizedtrees.classifiers import DecisionTreeClassifier
     from generalizedtrees.core import FeatureSpec
+    from sklearn.tree import DecisionTreeClassifier as SKDTC
 
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
 
     logger.info("Creating class instance")
-    dtc = DecisionTreeClassifier(max_tree_size = 5)
+    dtc = DecisionTreeClassifier(max_depth = 5)
 
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
 
-    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, (FeatureSpec.DISCRETE,)*d)
+    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, (FeatureSpec.CONTINUOUS,)*d)
+
+    logger.info(f'Learned tree:\n{dtc.show_tree()}')
 
     logger.info("Running prediction")
     dtc.predict(breast_cancer_data.x_test)
+
+    logger.info("Done")
+
+@pytest.mark.skip(reason="Don't know all the details to sklearn's implementation")
+def test_composed_dtc_prediction(breast_cancer_data, caplog):
+    import logging
+    from generalizedtrees.classifiers import DecisionTreeClassifier
+    from generalizedtrees.core import FeatureSpec
+    from sklearn.tree import DecisionTreeClassifier as SKDTC
+
+    logger = logging.getLogger()
+    caplog.set_level(logging.DEBUG)
+
+    logger.info("Creating class instance")
+    dtc = DecisionTreeClassifier(max_depth = 5)
+
+    logger.info("Fitting tree")
+    d = breast_cancer_data.x_train.shape[1]
+
+    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, (FeatureSpec.CONTINUOUS,)*d)
+
+    logger.info(f'Learned tree:\n{dtc.show_tree()}')
+
+    logger.info("Running prediction")
+    my_pr = dtc.predict(breast_cancer_data.x_test)
+
+    logger.info("Running Scikit-Learn's DT")
+    sk_dtc = SKDTC(criterion='entropy', max_depth=5)
+    sk_dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train)
+    sk_pr = sk_dtc.predict(breast_cancer_data.x_test)
+
+    logger.info("Comparing")
+    assert_allclose(my_pr, sk_pr)
 
     logger.info("Done")

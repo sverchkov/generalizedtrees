@@ -16,8 +16,8 @@
 
 
 from generalizedtrees.core import FeatureSpec
-from generalizedtrees.base import ClassificationTreeNode
-from generalizedtrees.splitting import fayyad_thresholds, one_vs_all, SplitTest, null_split
+from generalizedtrees.base import ClassificationTreeNode, SplitTest, null_split
+from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
 from generalizedtrees.scores import entropy
 from functools import cached_property
 from statistics import mode
@@ -52,25 +52,39 @@ class SupervisedClassifierNode(ClassificationTreeNode):
     def probabilities(self):
         slots = pd.Series(0, index=self.target_classes, dtype=np.float)
         freqs = pd.Series(self.targets).value_counts(normalize=True, sort=False)
-        return slots + freqs
+        return slots.add(freqs, fill_value=0.0)
 
     def node_proba(self, data_matrix):
         n = data_matrix.shape[0]
 
         return pd.DataFrame([self.probabilities] * n)
+    
+    def __str__(self):
+        if self.is_leaf:
+            return f'Predict {dict(self.probabilities)}'
+        else:
+            return str(self.split)
 
 
-def make_supervised_classifier_node(tree_model, branch=None, parent=None):
-
+def make_supervised_classifier_root(tree_model):
     node = SupervisedClassifierNode(tree_model.data, tree_model.targets, tree_model.target_classes)
-
-    if branch is None or parent is None:
-        node.idx = np.arange(node.src_data.shape[0], dtype=np.intp)
-    else:
-        node.idx = parent.idx[parent.split.pick_branches(node.src_data[parent.idx, :]) == node._child_index]
-        node.branch = branch
-        
+    node.idx = np.arange(node.src_data.shape[0], dtype=np.intp)
     return node
+
+def generate_supervised_classifier_children(tree_model, parent, split):
+    # Note: this can be implemented without referencing tree_model or split.
+    # Is that always the case?
+
+    # Get branching for training samples
+    branches = split.pick_branches(parent.data)
+
+    for b in np.unique(branches):
+        node = SupervisedClassifierNode(tree_model.data, tree_model.targets, tree_model.target_classes)
+        node.idx = parent.idx[branches == b]
+        node.branch = split.constraints[b]
+
+        logger.debug(f'Created node with subview {node.idx}')
+        yield node
 
 def construct_supervised_classifier_split(tree_model, node: SupervisedClassifierNode):
     data = node.data
@@ -86,6 +100,8 @@ def construct_supervised_classifier_split(tree_model, node: SupervisedClassifier
             best_split_score = new_score
             best_split = split
     
+    logger.debug(f'Best split "{best_split}" with score {best_split_score}')
+
     return best_split
 
 def make_split_candidates(feature_spec, data, targets):

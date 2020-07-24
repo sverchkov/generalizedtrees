@@ -53,6 +53,39 @@ class AbstractTreeBuilder(ABC):
         pass
 
 
+class SplitTest(ABC):
+    """
+    Base abstract class for splits.
+
+    A split is defined as a test with integer outcomes and a set of constraints each of which
+    corresponds to an outcome of the test.
+    """
+
+    @abstractmethod
+    def pick_branches(self, data_matrix):
+        pass
+
+    @property
+    @abstractmethod
+    def constraints(self):
+        pass
+
+
+class NullSplit(SplitTest):
+
+    def pick_branches(self, data_matrix):
+        raise ValueError("Null split has no branches")
+
+    @property
+    def constraints(self):
+        return ()
+    
+    def __repr__(self):
+        return 'Null-split'
+
+null_split = NullSplit()
+
+
 class TreeBuilder(AbstractTreeBuilder, TreeModel):
     """
     Greedy tree building strategy
@@ -60,7 +93,7 @@ class TreeBuilder(AbstractTreeBuilder, TreeModel):
 
     def _build(self):
 
-        root = self.new_node()
+        root = self.create_root()
         self.tree = root.plant_tree()
 
         queue = self.new_queue()
@@ -71,16 +104,18 @@ class TreeBuilder(AbstractTreeBuilder, TreeModel):
             node = queue.pop()
             node.split = self.construct_split(node)
 
-            for branch in node.split.constraints:
-
-                child = self.new_node(branch, node)
-                node.add_child(child)
-
-                if not self.local_stop(child):
-                    queue.push(child)
+            if node.split is not null_split:
+                for child in self.generate_children(node, node.split):
+                    node.add_child(child)
+                    if not self.local_stop(child):
+                        queue.push(child)
     
     @abstractmethod
-    def new_node(self, branch = None, parent = None):
+    def create_root(self) -> TreeNode:
+        pass
+
+    @abstractmethod
+    def generate_children(self, parent, split):
         pass
 
     @abstractmethod
@@ -97,24 +132,6 @@ class TreeBuilder(AbstractTreeBuilder, TreeModel):
 
     @abstractmethod
     def local_stop(self, node):
-        pass
-
-
-class SplitTest(ABC):
-    """
-    Base abstract class for splits.
-
-    A split is defined as a test with integer outcomes and a set of constraints each of which
-    corresponds to an outcome of the test.
-    """
-
-    @abstractmethod
-    def pick_branches(self, data_matrix):
-        pass
-
-    @property
-    @abstractmethod
-    def constraints(self):
         pass
 
 
