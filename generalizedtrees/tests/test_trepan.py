@@ -15,10 +15,10 @@
 # limitations under the License.
 
 import pytest
-from generalizedtrees.explainers import Trepan
 
 def test_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
 
+    from generalizedtrees.explainers import Trepan
     from generalizedtrees.core import FeatureSpec
     from logging import DEBUG
 

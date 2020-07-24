@@ -18,8 +18,7 @@
 ## Local stopping criteria
 
 def perfect_classification(self, node):
-    return all( node.targets == node.prediction)
-
+    return node.probabilities.max() >= 1
 
 ## Global stopping criteria
 

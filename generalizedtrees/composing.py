@@ -16,7 +16,7 @@
 
 from typing import Type, Any
 from dataclasses import make_dataclass
-from generalizedtrees.base import TreeBuilder, TreeEstimatorMixin
+from generalizedtrees.base import TreeBuilder, TreeClassifierMixin
 
 
 def compose_greedy_learner(
@@ -30,7 +30,7 @@ def compose_greedy_learner(
     local_stop # function of model, node
     ):
 
-    C = make_dataclass('C', fields=parameters, bases=(TreeBuilder, TreeEstimatorMixin))
+    C = make_dataclass('C', fields=parameters, bases=(TreeBuilder, TreeClassifierMixin))
 
     members = dict(
         fit=fitter,

@@ -17,7 +17,7 @@
 from typing import Tuple
 from generalizedtrees.base import AbstractTreeBuilder
 from generalizedtrees.core import FeatureSpec
-from numpy import ndarray
+from numpy import ndarray, unique
 
 def supervised_data_fit(
     tree_builder: AbstractTreeBuilder,
@@ -29,6 +29,8 @@ def supervised_data_fit(
     # TODO: Handle kwargs
 
     # Data checking can be inserted here
+
+    tree_builder.target_classes = unique(targets)
 
     tree_builder.data = data
     tree_builder.targets = targets

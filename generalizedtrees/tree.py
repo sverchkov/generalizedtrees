@@ -29,6 +29,7 @@ class TreeNode:
         # Private members
         self._tree: Tree = tree
         self._index: int = index
+        self._child_index: int = -1
         self._parent: int = parent
         self._children: Iterable[int] = []
         self._depth: int = depth
@@ -72,6 +73,7 @@ class TreeNode:
         child._parent = self._index
         n = len(self._tree)
         child._index = n
+        child._child_index = len(self._children)
         self._children.append(n)
         self._tree._nodes.append(child)
         d = self._depth + 1

@@ -15,26 +15,30 @@
 # limitations under the License.
 
 
-from generalizedtrees.base import TreeEstimatorNode
 from generalizedtrees.core import FeatureSpec
-from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
+from generalizedtrees.base import ClassificationTreeNode
+from generalizedtrees.splitting import fayyad_thresholds, one_vs_all, SplitTest, null_split
 from generalizedtrees.scores import entropy
 from functools import cached_property
 from statistics import mode
-from typing import List
+from typing import List, Optional
 import numpy as np
+import pandas as pd
 from logging import getLogger
 
 logger = getLogger()
 
-class SupervisedLearnerNode(TreeEstimatorNode):
 
-    def __init__(self, data, targets):
+class SupervisedClassifierNode(ClassificationTreeNode):
+
+    def __init__(self, data, targets, target_classes):
         super().__init__()
         self.src_data = data
         self.src_targets = targets
+        self.target_classes = target_classes
         self.branch = None
         self.idx = None
+        self.split: Optional[SplitTest] = None
     
     @property
     def data(self):
@@ -45,43 +49,36 @@ class SupervisedLearnerNode(TreeEstimatorNode):
         return self.src_targets[self.idx]
 
     @cached_property
-    def prediction(self):
-        return mode(self.targets)
-    
-    def predict(self, data_vector):
-        return self.prediction
+    def probabilities(self):
+        slots = pd.Series(0, index=self.target_classes, dtype=np.float)
+        freqs = pd.Series(self.targets).value_counts(normalize=True, sort=False)
+        return slots + freqs
 
-    def pick_branch(self, data_vector):
-    
-        for i in range(len(self)):
-            if self[i].branch.test(data_vector):
-                return i
-        
-        logger.error(f"""\
-            Unable to pick branch for:
-            data vector: {data_vector}
-            node: {self}""")
-        raise ValueError
+    def node_proba(self, data_matrix):
+        n = data_matrix.shape[0]
 
-def make_supervised_learner_node(tree_model, branch=None, parent=None):
+        return pd.DataFrame([self.probabilities] * n)
 
-    node = SupervisedLearnerNode(tree_model.data, tree_model.targets)
+
+def make_supervised_classifier_node(tree_model, branch=None, parent=None):
+
+    node = SupervisedClassifierNode(tree_model.data, tree_model.targets, tree_model.target_classes)
 
     if branch is None or parent is None:
-        node.idx = list(range(node.src_data.shape[0]))
+        node.idx = np.arange(node.src_data.shape[0], dtype=np.intp)
     else:
-        node.idx = [idx for idx in parent.idx if branch.test(node.src_data[idx, :])]
+        node.idx = parent.idx[parent.split.pick_branches(node.src_data[parent.idx, :]) == node._child_index]
         node.branch = branch
         
     return node
 
-def construct_supervised_learner_split(tree_model, node: SupervisedLearnerNode):
+def construct_supervised_classifier_split(tree_model, node: SupervisedClassifierNode):
     data = node.data
     targets = node.targets
     feature_spec = tree_model.feature_spec
 
     split_candidates = make_split_candidates(feature_spec, data, targets)
-    best_split = ()
+    best_split = null_split
     best_split_score = 0
     for split in split_candidates:
         new_score = information_gain(split, data, targets)
@@ -114,7 +111,8 @@ def information_gain(split, data, targets):
 
     A split is a tuple of constraints.
     """
+    branches = split.pick_branches(data)
     return entropy(targets) - sum(map(
-        lambda c: entropy(targets[np.apply_along_axis(c.test, 1, data)]),
-        split))
+        lambda b: entropy(targets[branches == b]),
+        np.unique(branches)))
 

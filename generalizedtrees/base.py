@@ -69,8 +69,9 @@ class TreeBuilder(AbstractTreeBuilder, TreeModel):
         while queue and not self.global_stop():
 
             node = queue.pop()
+            node.split = self.construct_split(node)
 
-            for branch in self.construct_split(node):
+            for branch in node.split.constraints:
 
                 child = self.new_node(branch, node)
                 node.add_child(child)
@@ -118,13 +119,17 @@ class SplitTest(ABC):
 
 
 class ClassificationTreeNode(TreeNode):
+    """
+    Mixin implementing classification tree node logic.
+
+    Class must have a 'split' field deriving from SplitTest.
+    """
+    def __init__(self):
+        super().__init__()
+        self.split: SplitTest
 
     def node_proba(self, data_matrix):
         raise NotImplementedError
-
-    @property
-    def split(self) -> Optional[SplitTest]:
-        return None
 
     def _predict_subtree_proba(self, data_matrix, idx, result):
 

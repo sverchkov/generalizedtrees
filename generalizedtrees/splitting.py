@@ -23,6 +23,17 @@ from generalizedtrees.constraints import LEQConstraint, GTConstraint, EQConstrai
 logger = logging.getLogger()
 
 # Split classes
+class NullSplit(SplitTest):
+
+    def pick_branches(self, data_matrix):
+        raise ValueError("Null split has no branches")
+
+    @property
+    def constraints(self):
+        return ()
+
+null_split = NullSplit()
+
 class SplitGT(SplitTest):
 
     def __init__(self, feature, value):
