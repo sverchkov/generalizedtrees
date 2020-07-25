@@ -20,9 +20,8 @@ from numpy.testing import assert_allclose
 def test_composed_dtc(breast_cancer_data, caplog):
 
     import logging
-    from generalizedtrees.classifiers import DecisionTreeClassifier
+    from generalizedtrees.recipes import DecisionTreeClassifier
     from generalizedtrees.core import FeatureSpec
-    from sklearn.tree import DecisionTreeClassifier as SKDTC
 
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
@@ -45,7 +44,7 @@ def test_composed_dtc(breast_cancer_data, caplog):
 @pytest.mark.skip(reason="Don't know all the details to sklearn's implementation")
 def test_composed_dtc_prediction(breast_cancer_data, caplog):
     import logging
-    from generalizedtrees.classifiers import DecisionTreeClassifier
+    from generalizedtrees.recipes import DecisionTreeClassifier
     from generalizedtrees.core import FeatureSpec
     from sklearn.tree import DecisionTreeClassifier as SKDTC
 

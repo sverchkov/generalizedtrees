@@ -15,17 +15,17 @@
 # limitations under the License.
 
 from dataclasses import field
-from generalizedtrees.composing import compose_greedy_learner
+from generalizedtrees.composing import greedy_classification_tree_learner
 from generalizedtrees.base import TreeBuilder
-from generalizedtrees.fitters import supervised_data_fit
+from generalizedtrees.fitters import supervised_data_fit, fit_with_data_and_oracle
 from generalizedtrees.splitters import \
     construct_supervised_classifier_split,\
     make_supervised_classifier_root,\
     generate_supervised_classifier_children
-from generalizedtrees.queues import Stack
+from generalizedtrees.queues import Stack, Heap
 from generalizedtrees.stopping import never, node_depth
 
-DecisionTreeClassifier = compose_greedy_learner(
+DecisionTreeClassifier = greedy_classification_tree_learner(
     name="DecisionTreeClassifier",
     parameters=[
         ('max_depth', int, field(default=10))
@@ -37,4 +37,16 @@ DecisionTreeClassifier = compose_greedy_learner(
     queue=Stack,
     global_stop=never,
     local_stop=node_depth
+)
+
+Trepan = greedy_classification_tree_learner(
+    name="Trepan",
+    parameters=[],
+    fitter=fit_with_data_and_oracle,
+    create_root=None,
+    construct_split=None,
+    generate_children=None,
+    queue=Heap,
+    global_stop=None,
+    local_stop=None
 )

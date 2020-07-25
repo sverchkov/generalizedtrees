@@ -19,7 +19,7 @@ from dataclasses import make_dataclass
 from generalizedtrees.base import TreeBuilder, TreeClassifierMixin
 
 
-def compose_greedy_learner(
+def greedy_classification_tree_learner(
     name: str,
     parameters, # As in dataclass
     fitter, # Fit function
