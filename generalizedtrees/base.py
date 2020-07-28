@@ -110,6 +110,9 @@ class TreeBuilder(AbstractTreeBuilder, TreeModel):
                     if not self.local_stop(child):
                         queue.push(child)
     
+    def prune(self):
+        pass
+    
     @abstractmethod
     def create_root(self) -> TreeNode:
         pass

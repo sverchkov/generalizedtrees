@@ -41,7 +41,7 @@ def test_composed_dtc(breast_cancer_data, caplog):
 
     logger.info("Done")
 
-@pytest.mark.skip(reason="Don't know all the details to sklearn's implementation")
+#@pytest.mark.skip(reason="Don't know all the details to sklearn's implementation")
 def test_composed_dtc_prediction(breast_cancer_data, caplog):
     import logging
     from generalizedtrees.recipes import DecisionTreeClassifier

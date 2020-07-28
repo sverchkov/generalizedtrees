@@ -15,6 +15,10 @@
 # limitations under the License.
 
 
+## General stopping criteria
+def never(*args):
+    return False
+
 ## Local stopping criteria
 
 def perfect_classification(self, node):
@@ -24,9 +28,6 @@ def node_depth(tree_model, node):
     return node.depth >= tree_model.max_depth
 
 ## Global stopping criteria
-
-def never(tree_model):
-    return False
 
 def tree_size_limit(self):
     return self.tree.size >= self.max_tree_size
