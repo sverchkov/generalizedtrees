@@ -21,7 +21,7 @@ from generalizedtrees.fitters import supervised_data_fit, fit_with_data_and_orac
 from generalizedtrees.splitters import information_gain, make_split_candidates
 from generalizedtrees.queues import Stack, Heap
 from generalizedtrees.stopping import never, node_depth, tree_size_limit
-from generalizedtrees.node_building import SupCferNodeBuilderMixin
+from generalizedtrees.node_building import SupCferNodeBuilderMixin, OGCferNodeBuilderMixin
 
 DecisionTreeClassifier = greedy_classification_tree_learner(
     name="DecisionTreeClassifier",
@@ -37,16 +37,16 @@ DecisionTreeClassifier = greedy_classification_tree_learner(
     local_stop=node_depth
 )
 
-# Trepan = greedy_classification_tree_learner(
-#     name="Trepan",
-#     parameters=[
-#         ('max_tree_size', int, field(default=20))
-#     ],
-#     fitter=fit_with_data_and_oracle,
-#     node_building=None,
-#     split_candidate_generator=make_split_candidates,
-#     split_score=information_gain,
-#     queue=Heap,
-#     global_stop=tree_size_limit,
-#     local_stop=never
-# )
+Trepan = greedy_classification_tree_learner(
+    name="Trepan",
+    parameters=[
+        ('max_tree_size', int, field(default=20))
+    ],
+    fitter=fit_with_data_and_oracle,
+    node_building=OGCferNodeBuilderMixin,
+    split_candidate_generator=make_split_candidates,
+    split_score=information_gain,
+    queue=Heap,
+    global_stop=tree_size_limit,
+    local_stop=never
+)

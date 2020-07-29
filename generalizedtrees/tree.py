@@ -53,7 +53,11 @@ class TreeNode:
         return self._tree
 
     @property
-    def is_leaf(self) -> int:
+    def is_root(self) -> bool:
+        return self.depth == 0
+
+    @property
+    def is_leaf(self) -> bool:
         return not self._children
 
     def __len__(self) -> int:
@@ -81,6 +85,7 @@ class TreeNode:
         if self._tree.depth < d:
             self._tree._tree_depth = d
     
+    @property
     def parent(self):
         return self._tree[self._parent]
 
