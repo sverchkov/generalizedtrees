@@ -1,4 +1,4 @@
-# Tests for standard trees
+# Feature type specification (classes and utilities)
 #
 # Copyright 2019 Yuriy Sverchkov
 #
@@ -14,19 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.deprecated.standard_trees import ModelTree
-from sklearn.utils.estimator_checks import check_estimator
-import pytest
+
+from enum import Flag, auto
+import pandas as pd #?
+import logging
+
+logger = logging.getLogger()
 
 
-@pytest.mark.skip(reason="can't run this check on modeltree yet")
-def test_model_tree_with_sklearn():
-    check_estimator(ModelTree)
+class FeatureSpec(Flag):
+    ORDERED = auto()
+    DISCRETE = auto()
+    ORDINAL = ORDERED | DISCRETE
+    CONTINUOUS = ORDERED # And not discrete
 
 
-if __name__ == "__main__":
-    import logging
-    logger = logging.getLogger(__name__)
-    logging.basicConfig(level=5)
+def infer_feature_spec(data_matrix):
 
-    test_model_tree_with_sklearn()
+    if isinstance(data_matrix, pd.DataFrame):
+
+        # Infer based on column types
+        raise NotImplementedError('Coming soon!')
+    
+    else:
+        raise NotImplementedError('Feature type inference only implemented for pandas DataFrames')

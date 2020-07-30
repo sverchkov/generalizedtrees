@@ -16,6 +16,9 @@
 
 from collections import deque
 from typing import Iterable, Any, List, NamedTuple, Union
+from logging import getLogger
+
+logger = getLogger()
 
 class TreeNode:
     """
@@ -67,7 +70,16 @@ class TreeNode:
         """
         We use slices to access child nodes
         """
-        return self._tree[self._children[key]]
+        try:
+            return self._tree[self._children[key]]
+        except:
+            logger.fatal(
+                'Something went wrong in getting a child node:\n'
+                f'key: {key}\n'
+                f'index of calling node: {self._index}\n'
+                f'indices of children: {self._children}\n'
+                f'tree size: {len(self._tree._nodes)}\n')
+            raise
 
     def add_child(self, child: 'TreeNode'):
         # TODO: Add check that child isn't already in some tree

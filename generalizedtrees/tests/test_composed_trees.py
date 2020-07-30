@@ -21,7 +21,7 @@ def test_composed_dtc(breast_cancer_data, caplog):
 
     import logging
     from generalizedtrees.recipes import DecisionTreeClassifier
-    from generalizedtrees.core import FeatureSpec
+    from generalizedtrees.features import FeatureSpec
 
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
@@ -45,7 +45,7 @@ def test_composed_dtc(breast_cancer_data, caplog):
 def test_composed_dtc_prediction(breast_cancer_data, caplog):
     import logging
     from generalizedtrees.recipes import DecisionTreeClassifier
-    from generalizedtrees.core import FeatureSpec
+    from generalizedtrees.features import FeatureSpec
     from sklearn.tree import DecisionTreeClassifier as SKDTC
 
     logger = logging.getLogger()
@@ -78,7 +78,8 @@ def test_composed_dtc_prediction(breast_cancer_data, caplog):
 def test_composed_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
 
     from generalizedtrees.recipes import Trepan
-    from generalizedtrees.core import FeatureSpec
+    from generalizedtrees.features import FeatureSpec
+    from time import perf_counter
     import logging
 
     logger = logging.getLogger()
@@ -91,11 +92,19 @@ def test_composed_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
     # Learn explanation
     d = x_train.shape[1]
 
+    t1 = perf_counter()
+
     logger.info("Creating class instance")
     trepan = Trepan()
 
     logger.info("Fitting tree")
     trepan.fit(x_train, model.predict_proba, feature_spec = (FeatureSpec.CONTINUOUS,)*d)
+
+    t2 = perf_counter()
+
+    logger.info(f'Time taken: {t2-t1}')
+
+    logger.info(f'Learned tree:\n{trepan.show_tree()}')
 
     # Make predictions
     logger.info("Running prediction")

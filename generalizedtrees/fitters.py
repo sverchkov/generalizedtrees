@@ -16,7 +16,7 @@
 
 from typing import Tuple
 from generalizedtrees.base import AbstractTreeBuilder
-from generalizedtrees.core import FeatureSpec
+from generalizedtrees.features import FeatureSpec
 import pandas as pd
 import numpy as np
 
@@ -66,6 +66,7 @@ def fit_with_data_and_oracle(
     # Targets of training data
     if tree_builder.oracle_gives_probabilities:
         tree_builder.targets = pd.DataFrame(tree_builder.oracle(tree_builder.data))
+        tree_builder.target_classes = tree_builder.targets.columns
     else:
         tree_builder.targets = pd.Series(tree_builder.oracle(tree_builder.data))
 

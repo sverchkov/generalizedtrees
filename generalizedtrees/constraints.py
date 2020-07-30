@@ -14,10 +14,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from enum import Flag, auto
-from generalizedtrees.core import Constraint
 import numpy as np
+
+
+class Constraint(ABC):
+
+    @abstractmethod
+    def test(self, sample):
+        pass
+
+    def __invert__(self):
+        return NegatedConstraint(self)
+
+
+class NegatedConstraint(Constraint):
+
+    def __init__(self, constraint):
+        self._constraint = constraint
+    
+    def test(self, sample):
+        return not self._constraint.test(sample)
+    
+    def __invert__(self):
+        return self._constraint
 
 
 class SingleFeatureConstraint(Constraint):
@@ -231,3 +252,11 @@ def vectorize_constraints(constraints, dimensions):
             raise NotImplementedError(f"Cannot vectorize constraint {constraint}")
 
     return upper, lower, upper_eq, lower_eq
+
+
+def test_all_x(constraints):
+    return lambda x: all([c.test(x) for c in constraints])
+
+
+def test_all_tuples(constraints):
+    return lambda pair: test_all_x(constraints)(pair[0])

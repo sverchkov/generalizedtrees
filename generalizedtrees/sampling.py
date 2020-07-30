@@ -15,8 +15,7 @@
 # limitations under the License.
 import numpy as np
 
-from generalizedtrees.constraints import vectorize_constraints
-from generalizedtrees.core import test_all_x
+from generalizedtrees.constraints import vectorize_constraints, test_all_x
 
 
 def univariate_gaussian_rejection_sample(

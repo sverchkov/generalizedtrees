@@ -14,19 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.core import FeatureSpec
+from generalizedtrees.features import FeatureSpec
 from collections import namedtuple
 import numpy as np
+import pandas as pd
 
 
 Generator = namedtuple("Generator", ["generate", "training_data"])
 
-def trepan_generator(tree_model, training_data):
+def trepan_generator(tree_model, training_data: pd.DataFrame):
     """
     The data generation scheme used in trepan
     """
 
     d = training_data.shape[1]
+    cols = training_data.columns
 
     # The Trepan generator independently generates the individual feature values.
     feature_generators = [
@@ -34,7 +36,7 @@ def trepan_generator(tree_model, training_data):
         for i in range(d)]
 
     return Generator(
-        generate = lambda: np.reshape([f() for f in feature_generators], (1, d)),
+        generate = lambda: pd.Series([f() for f in feature_generators], index=cols),
         training_data = training_data)
 
 def _feature_generator(data_vector, feature: FeatureSpec, rng=np.random.default_rng()):
@@ -48,7 +50,7 @@ def _feature_generator(data_vector, feature: FeatureSpec, rng=np.random.default_
             return lambda: rng.normal(
                 loc = rng.choice(data_vector, size=1),
                 scale = 1/np.sqrt(n),
-                size = 1)
+                size = 1)[0]
 
         elif feature & FeatureSpec.DISCRETE:
             # Sample from the empirical distribution

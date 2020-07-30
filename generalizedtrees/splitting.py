@@ -39,7 +39,16 @@ class SplitGT(SplitTest):
         self.value = value
     
     def pick_branches(self, data_matrix):
-        return (get_column(data_matrix, self.feature) > self.value).astype(np.intp)
+        try:
+            v = get_column(data_matrix, self.feature)
+            return (v > self.value).astype(np.intp)
+        except:
+            logger.fatal(
+                'Something went wrong.\n'
+                f'Feature: {self.feature}, Value: {self.value}\n'
+                f'Matrix:\n{data_matrix}\n'
+                f'Column returned:\n{v}')
+            raise
 
     @cached_property
     def constraints(self):

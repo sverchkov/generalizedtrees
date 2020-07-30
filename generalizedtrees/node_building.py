@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from generalizedtrees.base import SplitTest, ClassificationTreeNode, TreeBuilder
-from generalizedtrees.core import FeatureSpec
+from generalizedtrees.features import FeatureSpec
 from functools import cached_property, total_ordering
 from typing import Optional
 import numpy as np
@@ -231,32 +231,36 @@ class OGCferNodeBuilderMixin:
         branches = split.pick_branches(parent.training_data)
         gen_branches = split.pick_branches(parent.gen_data)
 
-        for b in np.unique(branches):
-            node = OGClassifierNode(
-                parent._src_training_data,
-                parent._src_training_target_proba,
-                parent.training_idx[branches == b],
-                self.oracle,
-                self.min_samples)
+        unique_branches = np.unique(branches)
 
-            node.local_constraint = split.constraints[b]
+        if len(unique_branches) > 1:
 
-            # Compute coverage
-            node.coverage = \
-                (len(node.training_idx) + sum(gen_branches == b)) / \
-                (len(parent.training_idx) + len(gen_branches)) * \
-                parent.coverage
-            
-            if same_distribution(
-                node.training_data,
-                parent.training_data,
-                self.feature_spec,
-                self.dist_test_alpha):
-                node.generator = parent.generator
-            else:
-                node.generator = self.new_generator(node.training_data)
+            for b in unique_branches:
+                node = OGClassifierNode(
+                    parent._src_training_data,
+                    parent._src_training_target_proba,
+                    parent.training_idx[branches == b],
+                    self.oracle,
+                    self.min_samples)
 
-            yield node
+                node.local_constraint = split.constraints[b]
+
+                # Compute coverage
+                node.coverage = \
+                    (len(node.training_idx) + sum(gen_branches == b)) / \
+                    (len(parent.training_idx) + len(gen_branches)) * \
+                    parent.coverage
+                
+                if same_distribution(
+                    node.training_data,
+                    parent.training_data,
+                    self.feature_spec,
+                    self.dist_test_alpha):
+                    node.generator = parent.generator
+                else:
+                    node.generator = self.new_generator(node.training_data)
+
+                yield node
 
 
 # Utility functions (TODO: Find a better-named home)
@@ -270,14 +274,13 @@ def draw_sample(constraints, n, columns, generator):
     if n < 1:
         return pd.DataFrame(columns=columns)
     else:
-        return pd.concat([draw_instance(constraints, generator) for _ in range(n)], axis=0)
+        return pd.DataFrame([draw_instance(constraints, generator) for _ in range(n)])
 
 def draw_instance(constraints, generator, max_attempts=100):
 
     for _ in range(max_attempts):
         instance = generator.generate()
-        if all([c.test(instance.flatten()) for c in constraints]):
-            logger.debug(f'produced instance shape {instance.shape}')
+        if all([c.test(instance) for c in constraints]):
             return instance
     
     raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')

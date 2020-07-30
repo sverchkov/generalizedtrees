@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 from generalizedtrees.tree import tree_to_str, Tree, TreeNode
 from typing import Optional, Tuple
 import numpy as np
+import pandas as pd
 
 
 class TreeModel:
@@ -172,7 +173,7 @@ class TreeClassifierMixin(TreeModel):
     The tree (self.tree) should be used with a tree 'planted' from a subclass of
     ClassificationTreeNode, or something that monkeys it. That is where actual branching
     logic and prediction happens.
-    The prediction functions also require a `target_classes` field to be defined.
+    The prediction functions also require a `target_classes` field/property to be defined.
     """
 
     def predict_proba(self, data_matrix):
@@ -185,11 +186,14 @@ class TreeClassifierMixin(TreeModel):
 
         result = np.empty((n, k), dtype=np.float)
 
-        return self.tree.root._predict_subtree_proba(
-            data_matrix,
-            np.arange(n, dtype=np.intp),
-            result)
+        return pd.DataFrame(
+            self.tree.root._predict_subtree_proba(
+                data_matrix,
+                np.arange(n, dtype=np.intp),
+                result),
+            columns=self.target_classes,
+            copy=False)
 
     def predict(self, data_matrix):
 
-        return self.target_classes[self.predict_proba(data_matrix).argmax(axis=1)]
+        return self.predict_proba(data_matrix).idxmax(axis=1)

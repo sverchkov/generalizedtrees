@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-from generalizedtrees.core import FeatureSpec
+from generalizedtrees.features import FeatureSpec
 from generalizedtrees.base import ClassificationTreeNode, SplitTest, null_split
 from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
 from generalizedtrees.scores import entropy
@@ -46,6 +46,9 @@ def make_split_candidates(feature_spec, data, targets):
     
     return result
 
+
+# Score functions for splits
+
 def information_gain(split, data, targets):
     """
     Compute the split score (information gain) for a split.
@@ -56,4 +59,3 @@ def information_gain(split, data, targets):
     return entropy(targets) - sum(map(
         lambda b: entropy(targets[branches == b]),
         np.unique(branches)))
-
