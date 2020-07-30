@@ -73,3 +73,32 @@ def test_composed_dtc_prediction(breast_cancer_data, caplog):
     assert_allclose(my_pr, sk_pr)
 
     logger.info("Done")
+
+
+def test_composed_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
+
+    from generalizedtrees.recipes import Trepan
+    from generalizedtrees.core import FeatureSpec
+    import logging
+
+    logger = logging.getLogger()
+    caplog.set_level(logging.DEBUG)
+
+    x_train = breast_cancer_data.x_train
+    x_test = breast_cancer_data.x_test
+    model = breast_cancer_rf_model
+
+    # Learn explanation
+    d = x_train.shape[1]
+
+    logger.info("Creating class instance")
+    trepan = Trepan()
+
+    logger.info("Fitting tree")
+    trepan.fit(x_train, model.predict_proba, feature_spec = (FeatureSpec.CONTINUOUS,)*d)
+
+    # Make predictions
+    logger.info("Running prediction")
+    trepan_predictions = trepan.predict(x_test)
+
+    logger.info("Done")

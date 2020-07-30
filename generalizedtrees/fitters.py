@@ -50,13 +50,18 @@ def fit_with_data_and_oracle(
     #oracle_gives_probabilities: bool = False, #TODO: Figure out need and scope
     #max_tree_size: Optional[int] = None, #TODO: Set in parameters/kwargs
     **kwargs):
+
+    # So far just blindly accepting kwargs. A little hacky.
+    tree_builder.__dict__.update(kwargs)
     
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(data)
     tree_builder.data = data
     _, tree_builder._d = np.shape(tree_builder.data)
 
     tree_builder.oracle = oracle
 
-    tree_builder.oracle_gives_probabilities = False #oracle_gives_probabilities
+    tree_builder.oracle_gives_probabilities = getattr(tree_builder, 'oracle_gives_probabilities', True)
 
     # Targets of training data
     if tree_builder.oracle_gives_probabilities:

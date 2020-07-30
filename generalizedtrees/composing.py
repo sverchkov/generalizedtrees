@@ -62,7 +62,8 @@ def greedy_classification_tree_learner(
     split_score, # Function (split, data, targets)
     queue: Type[Any], # Queue class
     global_stop, # function of model
-    local_stop # function of model, node
+    local_stop, # function of model, node
+    data_generator = None # Function, optional. Takes training data and outputs f(constraints, n) -> data
     ):
 
     bases = (node_building, TreeClassifierMixin, TreeBuilder)
@@ -76,6 +77,9 @@ def greedy_classification_tree_learner(
         global_stop=global_stop,
         local_stop=local_stop
     )
+
+    if data_generator is not None:
+        members.update(dict(new_generator=data_generator))
 
     #C = type('C', (TreeBuilder, TreeClassifierMixin, node_building), members)
 

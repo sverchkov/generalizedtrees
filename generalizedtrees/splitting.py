@@ -16,11 +16,19 @@
 
 import logging
 import numpy as np
+import pandas as pd
 from functools import cached_property
 from generalizedtrees.base import SplitTest
 from generalizedtrees.constraints import LEQConstraint, GTConstraint, EQConstraint, NEQConstraint
 
 logger = logging.getLogger()
+
+# Access helpers
+def get_column(data, feature):
+    if isinstance(data, pd.DataFrame):
+        return data.iloc[:, feature]
+    else:
+        return data[:, feature]
 
 # Split classes
 
@@ -31,7 +39,7 @@ class SplitGT(SplitTest):
         self.value = value
     
     def pick_branches(self, data_matrix):
-        return (data_matrix[:, self.feature] > self.value).astype(np.intp)
+        return (get_column(data_matrix, self.feature) > self.value).astype(np.intp)
 
     @cached_property
     def constraints(self):
@@ -50,7 +58,7 @@ class SplitOneVsAll(SplitTest):
         self.value = value
     
     def pick_branches(self, data_matrix):
-        return (data_matrix[:, self.feature] == self.value).astype(np.intp)
+        return (get_column(data_matrix, self.feature) == self.value).astype(np.intp)
 
     @cached_property
     def constraints(self):
@@ -67,9 +75,10 @@ class SplitEveryValue(SplitTest):
     def __init__(self, feature, values):
         self.feature = feature
         self.values = values
+        self.map = {values[i]: i for i in range(len(values))}
     
     def pick_branches(self, data_matrix):
-        return None
+        return get_column(data_matrix, self.feature).map(self.map)
 
     @cached_property
     def constraints(self):
@@ -93,7 +102,10 @@ def fayyad_thresholds(data, target, feature):
     :param target: Target value vector of length n
     :param feature: Index of splitting feature (integer >=0 and <d)
     """
-    v = sorted(zip(data[:,feature], target))
+    if isinstance(data, pd.DataFrame):
+        v = sorted(zip(data.iloc[:,feature], target))
+    else:
+        v = sorted(zip(data[:,feature], target))
 
     for j in range(1, len(v), 1):
         x_prev, y_prev = v[j-1]

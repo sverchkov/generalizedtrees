@@ -103,14 +103,14 @@ class OGClassifierNode(ClassificationTreeNode):
         self.local_constraint = None
         self.min_samples = min_samples
         self.split: Optional[SplitTest] = None 
-        self.training_data = training_data
-        self.training_target_proba = training_target_proba
+        self._src_training_data = training_data
+        self._src_training_target_proba = training_target_proba
         self.training_idx = training_idx
         self.generator = None
         # self.prediction_proba: pd.Series
         self.coverage = None
         # self.score = None
-        self.d = self.training_data.shape[1]
+        self.d = self._src_training_data.shape[1]
         self.oracle = oracle
 
     def __eq__(self, other):
@@ -130,18 +130,34 @@ class OGClassifierNode(ClassificationTreeNode):
             return f'Predict {dict(self.probabilities)}'
         else:
             return str(self.split)
+    
+    @cached_property
+    def training_data(self):
+        return self._src_training_data.iloc[self.training_idx, :]
+
+    @cached_property
+    def training_target_proba(self):
+        return self._src_training_target_proba.iloc[self.training_idx, :]
 
     @cached_property
     def gen_data(self):
         return draw_sample(
             self.constraints,
             self.min_samples - len(self.training_idx),
-            self.d,
+            self._src_training_data.columns,
             self.generator)
 
     @cached_property
     def gen_target_proba(self):
-        return self.oracle(self.gen_data)
+
+        if self.gen_data.shape[0] < 1:
+            return pd.DataFrame(columns=self._src_training_target_proba.columns)
+        
+        else:
+            result = self.oracle(self.gen_data)
+            if not isinstance(result, pd.DataFrame):
+                result = pd.DataFrame(result)
+            return result
     
     @cached_property
     def constraints(self):
@@ -156,11 +172,11 @@ class OGClassifierNode(ClassificationTreeNode):
 
     @cached_property
     def data(self):
-        return pd.concat([self.training_data[self.training_idx, :], self.gen_data])
+        return pd.concat([self.training_data, self.gen_data])
     
     @cached_property
     def target_proba(self):
-        return pd.concat([self.training_target_proba[self.training_idx, :], self.gen_target_proba])
+        return pd.concat([self.training_target_proba, self.gen_target_proba])
 
     def node_proba(self, data_matrix):
         n = data_matrix.shape[0]
@@ -176,6 +192,11 @@ class OGClassifierNode(ClassificationTreeNode):
         # Calculating fidelity as the target probability estimate dotted with itself since
         # The estimate is also the mean of the sample target probabilities
         return sum(self.probabilities * self.probabilities)
+    
+    @cached_property
+    def targets(self):
+        # For compatibility with split selectors that use targets
+        return self.target_proba.idxmax(axis=1)
 
 
 class OGCferNodeBuilderMixin:
@@ -191,6 +212,8 @@ class OGCferNodeBuilderMixin:
 
     def create_root(self):
         target_proba = self.oracle(self.data)
+        if not isinstance(target_proba, pd.DataFrame):
+            target_proba = pd.DataFrame(target_proba)
         root = OGClassifierNode(
             self.data,
             target_proba,
@@ -205,13 +228,13 @@ class OGCferNodeBuilderMixin:
 
     def generate_children(self, parent: OGClassifierNode, split: SplitTest):
 
-        branches = split.pick_branches(parent.training_data[parent.training_idx])
+        branches = split.pick_branches(parent.training_data)
         gen_branches = split.pick_branches(parent.gen_data)
 
         for b in np.unique(branches):
             node = OGClassifierNode(
-                parent.training_data,
-                parent.training_target_proba,
+                parent._src_training_data,
+                parent._src_training_target_proba,
                 parent.training_idx[branches == b],
                 self.oracle,
                 self.min_samples)
@@ -225,27 +248,27 @@ class OGCferNodeBuilderMixin:
                 parent.coverage
             
             if same_distribution(
-                node.training_data[node.training_idx],
-                parent.training_data[parent.generator.training_idx],
+                node.training_data,
+                parent.training_data,
                 self.feature_spec,
                 self.dist_test_alpha):
                 node.generator = parent.generator
             else:
-                node.generator = self.new_generator(node.training_data[node.training_idx])
+                node.generator = self.new_generator(node.training_data)
 
             yield node
 
 
 # Utility functions (TODO: Find a better-named home)
 
-def draw_sample(constraints, n, d, generator):
+def draw_sample(constraints, n, columns, generator):
     # Draws samples one at a time.
     # May be worth optimizing.
 
     logger.debug(f'Drawing sample of size {n}')
 
     if n < 1:
-        return np.zeros((0, d))
+        return pd.DataFrame(columns=columns)
     else:
         return pd.concat([draw_instance(constraints, generator) for _ in range(n)], axis=0)
 
@@ -263,20 +286,22 @@ def same_distribution(data_1, data_2, feature_spec, alpha):
     """
     Performs statistical test to determine if data are from the
     same distribution.
+
+    data_1 and data_2 need to be pandas dataframes
     """
     n_tests = 0
     min_p = 1.0
-    for i in len(feature_spec):
+    for i in range(len(feature_spec)):
 
         if feature_spec[i] & FeatureSpec.DISCRETE:
             # Get frequencies.
             # Note: we're assuming that the union of values present in the samples is
             # the set of possible values. This is not all possible values that the
             # variable could originally take.
-            v1, c1 = np.unique(data_1[:, i], return_counts=True)
+            v1, c1 = np.unique(data_1.iloc[:, i], return_counts=True)
             map1 = {v1[j]: c1[j] for j in range(len(v1))}
 
-            v2, c2 = np.unique(data_2[:, i], return_counts=True)
+            v2, c2 = np.unique(data_2.iloc[:, i], return_counts=True)
             map2 = {v2[j]: c2[j] for j in range(len(v2))}
 
             values = np.union1d(v1, v2)
@@ -295,7 +320,7 @@ def same_distribution(data_1, data_2, feature_spec, alpha):
         
         else:
             # KS-test
-            _, p = ks_2samp(data_1[:, i], data_2[:, i])
+            _, p = ks_2samp(data_1.iloc[:, i], data_2.iloc[:, i])
             if p < min_p:
                 min_p = p
             n_tests += 1
