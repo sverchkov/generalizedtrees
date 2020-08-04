@@ -75,7 +75,7 @@ def test_composed_dtc_prediction(breast_cancer_data, caplog):
     logger.info("Done")
 
 
-def test_composed_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
+def test_composed_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
 
     from generalizedtrees.recipes import Trepan
     from generalizedtrees.features import FeatureSpec
@@ -109,5 +109,45 @@ def test_composed_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
     # Make predictions
     logger.info("Running prediction")
     trepan_predictions = trepan.predict(x_test)
+
+    logger.info("Done")
+
+
+def test_composed_trepan_pandas(breast_cancer_data, breast_cancer_rf_model, caplog):
+
+    from generalizedtrees.recipes import Trepan
+    from generalizedtrees.features import FeatureSpec
+    import pandas as pd
+    from time import perf_counter
+    import logging
+
+    logger = logging.getLogger()
+    caplog.set_level(logging.DEBUG)
+
+    x_train = pd.DataFrame(breast_cancer_data.x_train, columns=breast_cancer_data.feature_names)
+    x_test = pd.DataFrame(breast_cancer_data.x_test, columns=breast_cancer_data.feature_names)
+    model = breast_cancer_rf_model
+
+    # Learn explanation
+    t1 = perf_counter()
+
+    logger.info("Creating class instance")
+    trepan = Trepan()
+
+    logger.info("Fitting tree")
+    oracle = lambda x: pd.DataFrame(model.predict_proba(x), columns=breast_cancer_data.target_names)
+    trepan.fit(x_train, oracle)
+
+    t2 = perf_counter()
+
+    logger.info(f'Time taken: {t2-t1}')
+
+    logger.info(f'Learned tree:\n{trepan.show_tree()}')
+
+    # Make predictions
+    logger.info("Running prediction")
+    trepan_predictions = trepan.predict(x_test)
+
+    logger.info(f'Predictions: {list(trepan_predictions)}')
 
     logger.info("Done")

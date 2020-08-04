@@ -33,9 +33,17 @@ def breast_cancer_data():
 
     x_train, x_test, y_train, y_test = train_test_split(bc.data, bc.target)
 
-    Dataset = namedtuple('Dataset', ['x_train', 'x_test', 'y_train', 'y_test'])
+    Dataset = namedtuple(
+        'Dataset',
+        ['x_train', 'x_test', 'y_train', 'y_test', 'feature_names', 'target_names'])
 
-    return Dataset(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test)
+    return Dataset(
+        x_train=x_train,
+        x_test=x_test,
+        y_train=y_train,
+        y_test=y_test,
+        feature_names=bc.feature_names,
+        target_names=bc.target_names)
 
 @pytest.fixture(scope="module")
 def breast_cancer_rf_model(breast_cancer_data):

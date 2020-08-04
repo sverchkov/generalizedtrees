@@ -152,17 +152,24 @@ class ClassificationTreeNode(TreeNode):
     def node_proba(self, data_matrix):
         raise NotImplementedError
 
-    def _predict_subtree_proba(self, data_matrix, idx, result):
+    def _predict_subtree_proba(self, data_frame, idx, result_matrix):
+        """
+        Workhorse for predicting probabilities according to the built tree.
+
+        data_frame: a pandas(-like) dataframe
+        idx: a numpy array of numeric instance indexes
+        result_matrix: a numpy matrix of probabilities
+        """
 
         if self.is_leaf:
-            result[idx,:] = self.node_proba(data_matrix[idx,])
+            result_matrix[idx,:] = self.node_proba(data_frame.iloc[idx])
         
         else:
-            branches = self.split.pick_branches(data_matrix[idx,])
+            branches = self.split.pick_branches(data_frame.iloc[idx])
             for b in np.unique(branches):
-                self[b]._predict_subtree_proba(data_matrix, idx[branches==b], result)
+                self[b]._predict_subtree_proba(data_frame, idx[branches==b], result_matrix)
 
-        return result
+        return result_matrix
 
 
 class TreeClassifierMixin(TreeModel):
@@ -195,5 +202,8 @@ class TreeClassifierMixin(TreeModel):
             copy=False)
 
     def predict(self, data_matrix):
+
+        if not isinstance(data_matrix, pd.DataFrame):
+            data_matrix = pd.DataFrame(data_matrix)
 
         return self.predict_proba(data_matrix).idxmax(axis=1)

@@ -34,7 +34,8 @@ def get_column(data, feature):
 
 class SplitGT(SplitTest):
 
-    def __init__(self, feature, value):
+    def __init__(self, feature, value, feature_name=None):
+        self.feature_name = feature_name
         self.feature = feature
         self.value = value
     
@@ -57,12 +58,17 @@ class SplitGT(SplitTest):
             GTConstraint(self.feature, self.value))
     
     def __str__(self):
-        return f'Test x[{self.feature}] > {self.value}'
+        if self.feature_name is None:
+            feature = f'x[{self.feature}]'
+        else:
+            feature = self.feature_name
+        return f'Test {feature} > {self.value}'
 
 
 class SplitOneVsAll(SplitTest):
 
-    def __init__(self, feature, value):
+    def __init__(self, feature, value, feature_name=None):
+        self.feature_name = feature_name
         self.feature = feature
         self.value = value
     
@@ -76,12 +82,17 @@ class SplitOneVsAll(SplitTest):
             EQConstraint(self.feature, self.value))
 
     def __str__(self):
-        return f'Test x[{self.feature}] == {self.value}'
+        if self.feature_name is None:
+            feature = f'x[{self.feature}]'
+        else:
+            feature = self.feature_name
+        return f'Test {feature} == {self.value}'
 
 
 class SplitEveryValue(SplitTest):
 
-    def __init__(self, feature, values):
+    def __init__(self, feature, values, feature_name=None):
+        self.feature_name = feature_name
         self.feature = feature
         self.values = values
         self.map = {values[i]: i for i in range(len(values))}
@@ -94,7 +105,11 @@ class SplitEveryValue(SplitTest):
         return (EQConstraint(self.feature, v) for v in self.values)
 
     def __str__(self):
-        return f'Test x[{self.feature}] against each of {self.values}'
+        if self.feature_name is None:
+            feature = f'x[{self.feature}]'
+        else:
+            feature = self.feature_name
+        return f'Test {feature} against each of {self.values}'
 
 
 # Test generators
@@ -113,8 +128,10 @@ def fayyad_thresholds(data, target, feature):
     """
     if isinstance(data, pd.DataFrame):
         v = sorted(zip(data.iloc[:,feature], target))
+        feature_name = data.columns[feature]
     else:
         v = sorted(zip(data[:,feature], target))
+        feature_name = None
 
     for j in range(1, len(v), 1):
         x_prev, y_prev = v[j-1]
@@ -128,7 +145,7 @@ def fayyad_thresholds(data, target, feature):
             # Only place splits between distinct y-values
             if y_collision or y_prev != y:
                 split_point = (x_prev + x)/2
-                yield SplitGT(feature, split_point)
+                yield SplitGT(feature, split_point, feature_name=feature_name)
             # Reset collision flag when advancing in x-space
             y_collision = False
         else:
@@ -143,8 +160,18 @@ def one_vs_all(data, feature):
     :param data: Input data matrix, n-by-d
     :param feature: Index of splitting feature (integer >=0 and <d)
     """
-    for x in np.unique(data[:,feature]):
-        yield SplitOneVsAll(feature, x)
+
+    if isinstance(data, pd.DataFrame):
+        values = data.iloc[:,feature].unique()
+        if values.dtype == 'category':
+            values = values.cat.categories
+        feature_name = data.columns[feature]
+    else:
+        values = np.unique(data[:,feature])
+        feature_name = None
+    
+    for x in values:
+        yield SplitOneVsAll(feature, x, feature_name=feature_name)
 
 
 def binary_threshold(data, feature):
