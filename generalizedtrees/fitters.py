@@ -54,8 +54,8 @@ def fit_with_data_and_oracle(
     tree_builder.__dict__.update(kwargs)
 
     # Infer feature_spec if not given
-    if not hasattr(self, 'feature_spec'):
-        self.feature_spec = infer_feature_spec(data)
+    if not hasattr(tree_builder, 'feature_spec'):
+        tree_builder.feature_spec = infer_feature_spec(data)
     
     if not isinstance(data, pd.DataFrame):
         data = pd.DataFrame(data)
