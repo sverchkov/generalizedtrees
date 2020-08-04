@@ -16,6 +16,7 @@
 
 
 from enum import Flag, auto
+from typing import Tuple
 import pandas as pd #?
 import logging
 
