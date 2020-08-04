@@ -29,7 +29,7 @@ class FeatureSpec(Flag):
     CONTINUOUS = ORDERED # And not discrete
 
 
-def infer_feature_spec_of_dtype(d_type) -> Featurespec:
+def infer_feature_spec_of_dtype(d_type) -> FeatureSpec:
     """
     Maps numpy dtypes to FeatureSpecs.
 
