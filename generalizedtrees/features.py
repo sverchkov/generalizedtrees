@@ -61,7 +61,7 @@ def infer_feature_spec_of_dtype(d_type) -> FeatureSpec:
         return FeatureSpec.DISCRETE
 
 
-def infer_feature_spec(data_matrix) -> Tuple(FeatureSpec):
+def infer_feature_spec(data_matrix) -> Tuple[FeatureSpec]:
 
     if isinstance(data_matrix, pd.DataFrame):
 
