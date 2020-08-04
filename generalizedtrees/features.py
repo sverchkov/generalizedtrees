@@ -29,12 +29,42 @@ class FeatureSpec(Flag):
     CONTINUOUS = ORDERED # And not discrete
 
 
-def infer_feature_spec(data_matrix):
+def infer_feature_spec_of_dtype(d_type) -> Featurespec:
+    """
+    Maps numpy dtypes to FeatureSpecs.
+
+    Makes use of dtype.kind attribute (see numpy documentation)
+    Currently, classifies datatypes as follows:
+    Continuous (ordered and not discrete):
+        i (signed integer) *
+        u (unsigned integer) *
+        f (floating point)
+        m (timedelta)
+        M (datetime)
+    The remaining datatypes are classified as discrete (and unordered):
+        b (boolean) *
+        c (complex floating-point) **
+        O (object)
+        S (byte-)string
+        U Unicode
+        V void
+    
+    * Booleans and integers are technically discrete and ordered. Current
+    code isn't set up to handle that, so we classify as above.
+    ** Complex floating-point is technically non-ordered non-discrete, but
+    we don't anticipate handling complex numbers in the forseeable future.
+    """
+    if d_type.kind in 'iufmM':
+        return FeatureSpec.CONTINUOUS
+    else:
+        return FeatureSpec.DISCRETE
+
+
+def infer_feature_spec(data_matrix) -> Tuple(FeatureSpec):
 
     if isinstance(data_matrix, pd.DataFrame):
 
-        # Infer based on column types
-        raise NotImplementedError('Coming soon!')
+        return tuple(data_matrix.dtypes.map(infer_feature_spec_of_dtype))
     
     else:
         raise NotImplementedError('Feature type inference only implemented for pandas DataFrames')

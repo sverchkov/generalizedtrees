@@ -196,7 +196,14 @@ class OGClassifierNode(ClassificationTreeNode):
     @cached_property
     def targets(self):
         # For compatibility with split selectors that use targets
-        return self.target_proba.idxmax(axis=1)
+        try:
+            return self.target_proba.idxmax(axis=1)
+        except:
+            logger.critical(
+                'Something went wrong when inferring hard target classes.'
+                'Target probability vector:'
+                f'\n{self.target_proba}')
+            raise
 
 
 class OGCferNodeBuilderMixin:

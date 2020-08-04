@@ -41,6 +41,7 @@ DecisionTreeClassifier = greedy_classification_tree_learner(
 Trepan = greedy_classification_tree_learner(
     name="Trepan",
     parameters=[
+        ('use_m_of_n', bool, field(default=False)),
         ('max_tree_size', int, field(default=20)),
         ('min_samples', int, field(default=100)),
         ('dist_test_alpha', float, field(default=0.05))

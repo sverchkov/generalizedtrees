@@ -16,7 +16,7 @@
 
 from typing import Tuple
 from generalizedtrees.base import AbstractTreeBuilder
-from generalizedtrees.features import FeatureSpec
+from generalizedtrees.features import FeatureSpec, infer_feature_spec
 import pandas as pd
 import numpy as np
 
@@ -46,13 +46,16 @@ def fit_with_data_and_oracle(
     tree_builder,
     data,
     oracle,
-    #feature_spec: Tuple[FeatureSpec, ...], #TODO: Infer feature_spec
     #oracle_gives_probabilities: bool = False, #TODO: Figure out need and scope
     #max_tree_size: Optional[int] = None, #TODO: Set in parameters/kwargs
     **kwargs):
 
     # So far just blindly accepting kwargs. A little hacky.
     tree_builder.__dict__.update(kwargs)
+
+    # Infer feature_spec if not given
+    if not hasattr(self, 'feature_spec'):
+        self.feature_spec = infer_feature_spec(data)
     
     if not isinstance(data, pd.DataFrame):
         data = pd.DataFrame(data)
