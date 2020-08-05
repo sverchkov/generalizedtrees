@@ -1,6 +1,6 @@
-# Tests for standard trees
+# Implementations of stopping criteria
 #
-# Copyright 2019 Yuriy Sverchkov
+# Copyright 2020 Yuriy Sverchkov
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,20 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.standard_trees import DecisionTreeClassifier
-from sklearn.utils.estimator_checks import check_estimator
-import pytest
 
+## General stopping criteria
+def never(*args):
+    return False
 
-@pytest.mark.slow
-def test_decision_tree_with_sklearn():
-    check_estimator(DecisionTreeClassifier)
+## Local stopping criteria
 
+def perfect_classification(self, node):
+    return node.probabilities.max() >= 1
 
-if __name__ == "__main__":
-    import logging
-    logger = logging.getLogger(__name__)
-    logging.basicConfig(level=5)
+def node_depth(tree_model, node):
+    return node.depth >= tree_model.max_depth
 
-    test_decision_tree_with_sklearn()
+## Global stopping criteria
 
+def tree_size_limit(self):
+    return self.tree.size >= self.max_tree_size

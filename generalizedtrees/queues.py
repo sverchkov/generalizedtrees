@@ -1,6 +1,6 @@
-# Scoring functions
+# Packaged queue and stack classes
 #
-# Copyright 2019 Yuriy Sverchkov
+# Copyright 2020 Yuriy Sverchkov
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,37 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
+from heapq import heappush, heappop
+from collections import deque
 
+class Heap(list):
 
-def gini(y):
-    n: int = len(y)
-
-    if n == 0:
-        return 0
-
-    p = np.unique(y, return_counts=True)[1] / n
-
-    return 1 - sum(p*p)
-
-
-def entropy(y):
-    n = len(y)
-
-    if n == 0:
-        return 0
-
-    p = np.unique(y, return_counts=True)[1] / n
-
-    return entropy_of_p_vector(p)
-
-
-def entropy_of_p_matrix(pm):
-
-    return entropy_of_p_vector(np.mean(pm, axis=0))
-
-def entropy_of_p_vector(p):
+    def push(self, item):
+        heappush(self, item)
     
-    pl2p = np.where(p > 0, -p*np.log2(p), 0)
+    def pop(self):
+        return heappop(self)
 
-    return sum(pl2p)
+class Stack(deque):
+
+    def push(self, item):
+        self.append(item)
+
+class Queue(Stack):
+
+    def pop(self):
+        return super().popleft()
+    
+    def popright(self):
+        return super().pop()

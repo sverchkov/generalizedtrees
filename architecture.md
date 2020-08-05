@@ -1,4 +1,4 @@
-# Package Architecture 0.0.2
+# Package Architecture 0.0.4
 
 The main purpose of this package is to serve as a library that provides [Scikit Learn]-compatible tree classifiers and
 regressors.
@@ -11,6 +11,11 @@ Specifically we provide the following implementations:
 
 To be a [scikit-learn]-compatible classifier (regressor), a model must be implemented as a class that inherits from the
 [sklearn.base.BaseEstimator] base class and the [sklearn.base.ClassifierMixin] ([sklearn.base.RegressorMixin]) mixin.
+
+Since version 0.0.4 we're working on a new package architecture (to be documented).
+Much code is left over that uses the old package architecture (0.0.2) and needs to be phased out.
+
+## Old package architecture (0.0.2)
 
 We implement high-level decision/regression tree -building logic in the abstract class [abstract.AbstractTreeEstimator].
 All concrete tree estimators therefore have the following declaration of inheritance:

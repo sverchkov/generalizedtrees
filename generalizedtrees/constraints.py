@@ -1,8 +1,6 @@
-# Trepan-like mimic tree learner
+# Classes for defining constraints used in tests/splits in a decision tree.
 #
-# Based on Trepan (Craven and Shavlik 1996)
-#
-# Copyright 2019 Yuriy Sverchkov
+# Copyright 2020 Yuriy Sverchkov
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,9 +14,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod
-from generalizedtrees.core import Constraint
+from abc import ABC, abstractmethod
+from enum import Flag, auto
 import numpy as np
+
+
+class Constraint(ABC):
+
+    @abstractmethod
+    def test(self, sample):
+        pass
+
+    def __invert__(self):
+        return NegatedConstraint(self)
+
+
+class NegatedConstraint(Constraint):
+
+    def __init__(self, constraint):
+        self._constraint = constraint
+    
+    def test(self, sample):
+        return not self._constraint.test(sample)
+    
+    def __invert__(self):
+        return self._constraint
 
 
 class SingleFeatureConstraint(Constraint):
@@ -57,6 +77,12 @@ class LEQConstraint(SingleFeatureConstraint):
     def __repr__(self):
         return f"[{self.feature}]<={self._value}"
 
+    def __eq__(self, other):
+        return other is self or \
+            (isinstance(other, LEQConstraint) and
+            other.feature == self.feature and
+            other.value == self.value)
+
 
 class GTConstraint(SingleFeatureConstraint):
 
@@ -76,6 +102,12 @@ class GTConstraint(SingleFeatureConstraint):
 
     def __repr__(self):
         return f"[{self.feature}]>{self._value}"
+
+    def __eq__(self, other):
+        return other is self or \
+            (isinstance(other, GTConstraint) and
+            other.feature == self.feature and
+            other.value == self.value)
 
 
 class EQConstraint(SingleFeatureConstraint):
@@ -97,6 +129,12 @@ class EQConstraint(SingleFeatureConstraint):
     def __repr__(self):
         return f"[{self.feature}]=={self.value}"
 
+    def __eq__(self, other):
+        return other is self or \
+            (isinstance(other, EQConstraint) and
+            other.feature == self.feature and
+            other.value == self.value)
+
 
 class NEQConstraint(SingleFeatureConstraint):
 
@@ -117,16 +155,34 @@ class NEQConstraint(SingleFeatureConstraint):
     def __repr__(self):
         return f"[{self.feature}]!={self.value}"
 
+    def __eq__(self, other):
+        return other is self or \
+            (isinstance(other, NEQConstraint) and
+            other.feature == self.feature and
+            other.value == self.value)
 
-class NofMConstraint(Constraint):
 
-    def __init__(self, n, constraints):
+class MofN(Constraint):
+
+    class SearchOperator(Flag):
+        INC_M = auto()
+        INC_N = auto()
+        INC_NM = INC_N | INC_M
+
+    def __init__(self, m, constraints):
+
+        # TODO: Check if any of the constraints cancel each other out
+
         self._constraints = constraints
-        self._n = n
+        self._m = m
 
     @property
-    def n_to_satisfy(self):
-        return self._n
+    def constraints(self):
+        return self._constraints
+
+    @property
+    def m_to_satisfy(self):
+        return self._m
 
     @property
     def number_of_constraints(self):
@@ -138,11 +194,46 @@ class NofMConstraint(Constraint):
 
         for c in self._constraints:
             satisfied += c.test(sample)  # Implicitly converting bool to 0/1
-            if satisfied >= self._n:
+            if satisfied >= self._m:
                 return True
 
         return False
 
+    def __eq__(self, other):
+        return other is self or \
+            (isinstance(other, MofN) and
+            other.constraints == self.constraints and
+            other.m_to_satisfy == self.m_to_satisfy)
+
+
+    @staticmethod
+    def neighboring_tests(
+        constraint,
+        constraint_candidates,
+        search_operators=[SearchOperator.INC_N, SearchOperator.INC_NM]):
+        """
+        Expand an atomic or an m-of-n constraint by one step using the search operators specified
+        and the set of atomic constraints specified.
+        """
+
+        # Wrap input constraint as 1-of-1 if it's not an m-of-n constraint:
+        if not isinstance(constraint, MofN):
+            constraint = MofN(1, (constraint,))
+        
+        for operator in search_operators:
+
+            new_m = constraint.m_to_satisfy + \
+                (1 if operator & MofN.SearchOperator.INC_M else 0)
+
+            if operator & MofN.SearchOperator.INC_N:
+                for atom in constraint_candidates:
+                    new_atoms = constraint.constraints + (atom,)
+
+                    yield MofN(new_m, new_atoms)
+            
+            else:
+                yield MofN(new_m, constraint.constraints)
+        
 
 def vectorize_constraints(constraints, dimensions):
     upper = np.full(dimensions, np.inf)
@@ -161,3 +252,11 @@ def vectorize_constraints(constraints, dimensions):
             raise NotImplementedError(f"Cannot vectorize constraint {constraint}")
 
     return upper, lower, upper_eq, lower_eq
+
+
+def test_all_x(constraints):
+    return lambda x: all([c.test(x) for c in constraints])
+
+
+def test_all_tuples(constraints):
+    return lambda pair: test_all_x(constraints)(pair[0])

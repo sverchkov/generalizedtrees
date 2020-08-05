@@ -17,7 +17,7 @@
 from setuptools import setup, find_packages
 
 
-with open("README.md", "r") as fh:
+with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 with open("oldest") as fh:
@@ -25,16 +25,16 @@ with open("oldest") as fh:
 
 setup(
     name="generalizedtrees",
-    version="0.0.3",
+    version="0.0.5",
     author="Yuriy Sverchkov",
     author_email="yuriy.sverchkov@wisc.edu",
     description="Library for tree models: decision trees, model trees, mimic models, etc.",
     long_description=long_description,
-    long_description_content_type="text/markdown",
+    long_description_content_type="text/x-rst",
     license="Apache 2",
     keywords="machine learning decision trees model",
     url="https://github.com/Craven-Biostat-Lab/generalizedtrees",
-    packages=['generalizedtrees'],
+    packages=find_packages(exclude=['*.tests']),
     install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
