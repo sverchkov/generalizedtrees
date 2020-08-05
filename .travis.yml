@@ -4,21 +4,21 @@ matrix:
   include:
 
     - name: "Using oldest compatible package versions"
-      python: "3.6"
+      python: "3.8"
       script:
         - pytest
       install:
         - pip install -r oldest -r testing-requirements.txt
 
-    - name: "Using up to date packages with python 3.6"
-      python: "3.6"
+    - name: "Using up to date packages with python 3.7"
+      python: "3.7"
       script:
         - pytest
       install:
         - pip install -r requirements.txt -r testing-requirements.txt
 
-    - name: "Using up to date packages with python 3.7"
-      python: "3.7"
+    - name: "Using up to date packages with python 3.8"
+      python: "3.8"
       script:
         - pytest --cov=generalizedtrees --cov-report xml
       install:
