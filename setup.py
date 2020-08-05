@@ -25,7 +25,7 @@ with open("oldest") as fh:
 
 setup(
     name="generalizedtrees",
-    version="0.0.5",
+    version="0.0.6",
     author="Yuriy Sverchkov",
     author_email="yuriy.sverchkov@wisc.edu",
     description="Library for tree models: decision trees, model trees, mimic models, etc.",
