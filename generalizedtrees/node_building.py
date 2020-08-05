@@ -289,7 +289,7 @@ def draw_sample(constraints, n, columns, generator):
     else:
         return pd.DataFrame([draw_instance(constraints, generator) for _ in range(n)])
 
-def draw_instance(constraints, generator, max_attempts=100):
+def draw_instance(constraints, generator, max_attempts=1000):
 
     for _ in range(max_attempts):
         instance = generator.generate()

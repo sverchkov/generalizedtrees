@@ -28,16 +28,17 @@ Installation
 ============
 
 The latest stable version is on PyPI.
-Install it with
+Install it with::
 
     pip install generalizedtrees
 
 Dependencies
 ============
- * Python (>=3.6)
- * scikit-learn (>=0.21.3)
- * NumPy (>=1.17.2)
- * SciPy (>=1.3.1)
+* Python (>=3.8)
+* scikit-learn
+* NumPy
+* SciPy
+* Pandas
 
 Development
 ===========
@@ -48,11 +49,11 @@ Building
 --------
 
 We use the standard Python process for building the package.
-Run
+Run::
 
     python setup.py building
 
-to locally build the package, and
+to locally build the package, and::
 
     python setup.py install
 
@@ -62,7 +63,7 @@ Testing
 -------
 
 We use pytest_ for testing.
-Run
+Run::
 
     pytest
 
