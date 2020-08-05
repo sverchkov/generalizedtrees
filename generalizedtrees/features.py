@@ -17,46 +17,58 @@
 
 from enum import Flag, auto
 from typing import Tuple
-import pandas as pd #?
+import pandas as pd
 import logging
 
 logger = logging.getLogger()
 
+category_dtype = pd.CategoricalDtype()
 
 class FeatureSpec(Flag):
+    # Base flags:
     ORDERED = auto()
     DISCRETE = auto()
+    # Derived flags:
     ORDINAL = ORDERED | DISCRETE
     CONTINUOUS = ORDERED # And not discrete
+    UNCOUNTABLE = 0 # Neither ordered nor discrete
 
 
 def infer_feature_spec_of_dtype(d_type) -> FeatureSpec:
     """
-    Maps numpy dtypes to FeatureSpecs.
+    Maps numpy/pandas dtypes to FeatureSpecs.
+
+    'category' dtypes are discrete, and treated according to their 'ordered' attribute.
 
     Makes use of dtype.kind attribute (see numpy documentation)
     Currently, classifies datatypes as follows:
     Continuous (ordered and not discrete):
-        i (signed integer) *
-        u (unsigned integer) *
         f (floating point)
         m (timedelta)
         M (datetime)
-    The remaining datatypes are classified as discrete (and unordered):
-        b (boolean) *
-        c (complex floating-point) **
+    Ordinal (ordered and discrete)
+        i (signed integer)
+        u (unsigned integer)
+        b (boolean)
+    Neither ordered nor discrete:
+        c (complex floating-point)
+    Remaining types are discrete (and unordered):
         O (object)
         S (byte-)string
         U Unicode
         V void
-    
-    * Booleans and integers are technically discrete and ordered. Current
-    code isn't set up to handle that, so we classify as above.
-    ** Complex floating-point is technically non-ordered non-discrete, but
-    we don't anticipate handling complex numbers in the forseeable future.
     """
-    if d_type.kind in 'iufmM':
+    if category_dtype == d_type:
+        if d_type.ordered:
+            return FeatureSpec.ORDINAL
+        else:
+            return FeatureSpec.DISCRETE
+    elif d_type.kind in 'fmM':
         return FeatureSpec.CONTINUOUS
+    elif d_type.kind in 'iub':
+        return FeatureSpec.ORDINAL
+    elif d_type.kind in 'c':
+        return FeatureSpec.UNCOUNTABLE
     else:
         return FeatureSpec.DISCRETE
 

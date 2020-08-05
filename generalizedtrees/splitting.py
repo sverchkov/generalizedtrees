@@ -26,7 +26,7 @@ logger = logging.getLogger()
 # Access helpers
 def get_column(data, feature):
     if isinstance(data, pd.DataFrame):
-        return data.iloc[:, feature]
+        return data.iloc[:, feature].array
     else:
         return data[:, feature]
 

@@ -32,7 +32,7 @@ def test_composed_dtc(breast_cancer_data, caplog):
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
 
-    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, (FeatureSpec.CONTINUOUS,)*d)
+    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, feature_spec=(FeatureSpec.CONTINUOUS,)*d)
 
     logger.info(f'Learned tree:\n{dtc.show_tree()}')
 
@@ -40,6 +40,7 @@ def test_composed_dtc(breast_cancer_data, caplog):
     dtc.predict(breast_cancer_data.x_test)
 
     logger.info("Done")
+
 
 @pytest.mark.skip(reason="Don't know all the details to sklearn's implementation")
 def test_composed_dtc_prediction(breast_cancer_data, caplog):
@@ -57,7 +58,7 @@ def test_composed_dtc_prediction(breast_cancer_data, caplog):
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
 
-    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, (FeatureSpec.CONTINUOUS,)*d)
+    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, feature_spec=(FeatureSpec.CONTINUOUS,)*d)
 
     logger.info(f'Learned tree:\n{dtc.show_tree()}')
 
@@ -71,6 +72,29 @@ def test_composed_dtc_prediction(breast_cancer_data, caplog):
 
     logger.info("Comparing")
     assert_allclose(my_pr, sk_pr)
+
+    logger.info("Done")
+
+
+def test_composed_dtc_pandas(breast_cancer_data_pandas, caplog):
+    import logging
+    from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.features import FeatureSpec
+
+    logger = logging.getLogger()
+    caplog.set_level(logging.DEBUG)
+
+    logger.info("Creating class instance")
+    dtc = DecisionTreeClassifier(max_depth = 5)
+
+    logger.info("Fitting tree")
+
+    dtc.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
+
+    logger.info(f'Learned tree:\n{dtc.show_tree()}')
+
+    logger.info("Running prediction")
+    dtc.predict(breast_cancer_data_pandas.x_test)
 
     logger.info("Done")
 
@@ -108,12 +132,13 @@ def test_composed_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplo
 
     # Make predictions
     logger.info("Running prediction")
-    trepan_predictions = trepan.predict(x_test)
+    #trepan_predictions =
+    trepan.predict(x_test)
 
     logger.info("Done")
 
 
-def test_composed_trepan_pandas(breast_cancer_data, breast_cancer_rf_model, caplog):
+def test_composed_trepan_pandas(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
 
     from generalizedtrees.recipes import Trepan
     from generalizedtrees.features import FeatureSpec
@@ -124,18 +149,22 @@ def test_composed_trepan_pandas(breast_cancer_data, breast_cancer_rf_model, capl
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
 
-    x_train = pd.DataFrame(breast_cancer_data.x_train, columns=breast_cancer_data.feature_names)
-    x_test = pd.DataFrame(breast_cancer_data.x_test, columns=breast_cancer_data.feature_names)
+    x_train = breast_cancer_data_pandas.x_train
+    x_test = breast_cancer_data_pandas.x_test
     model = breast_cancer_rf_model
+    target_names = breast_cancer_data_pandas.target_names
+
+    # Verify output shape of model
+    logger.debug(f'Model probability prediction:\n{model.predict_proba(x_test)}')   
 
     # Learn explanation
     t1 = perf_counter()
 
-    logger.info("Creating class instance")
+    logger.info('Creating class instance')
     trepan = Trepan()
 
-    logger.info("Fitting tree")
-    oracle = lambda x: pd.DataFrame(model.predict_proba(x), columns=breast_cancer_data.target_names)
+    logger.info('Fitting tree')
+    oracle = lambda x: pd.DataFrame(model.predict_proba(x), columns=target_names)
     trepan.fit(x_train, oracle)
 
     t2 = perf_counter()
@@ -145,7 +174,7 @@ def test_composed_trepan_pandas(breast_cancer_data, breast_cancer_rf_model, capl
     logger.info(f'Learned tree:\n{trepan.show_tree()}')
 
     # Make predictions
-    logger.info("Running prediction")
+    logger.info('Running prediction')
     trepan_predictions = trepan.predict(x_test)
 
     logger.info(f'Predictions: {list(trepan_predictions)}')

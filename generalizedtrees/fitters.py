@@ -24,18 +24,29 @@ def supervised_data_fit(
     tree_builder: AbstractTreeBuilder,
     data: np.ndarray,
     targets: np.ndarray,
-    feature_spec: Tuple[FeatureSpec],
     **kwargs):
 
-    # TODO: Handle kwargs
+    # So far just blindly accepting kwargs. A little hacky.
+    tree_builder.__dict__.update(kwargs)
 
     # Data checking can be inserted here
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(data)
+    tree_builder.data = data
 
-    tree_builder.target_classes = np.unique(targets)
+    if not isinstance(targets, pd.Series):
+        targets = pd.Series(targets)
+
+    # Infer target_classes if not given
+    if not hasattr(tree_builder, 'target_classes'):
+        tree_builder.target_classes = targets.unique()
+
+    # Infer feature_spec if not given
+    if not hasattr(tree_builder, 'feature_spec'):
+        tree_builder.feature_spec = infer_feature_spec(data)
 
     tree_builder.data = data
     tree_builder.targets = targets
-    tree_builder.feature_spec = feature_spec
 
     tree_builder._build()
     tree_builder.prune()

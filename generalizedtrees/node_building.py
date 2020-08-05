@@ -30,6 +30,12 @@ logger = getLogger()
 class SupervisedClassifierNode(ClassificationTreeNode):
 
     def __init__(self, data, targets, target_classes):
+        """
+        Supervised classifier node constructor
+
+        Data: must be pandas dataframe-like
+        Targets: should be pandas series-like.
+        """
         super().__init__()
         self.src_data = data
         self.src_targets = targets
@@ -40,11 +46,11 @@ class SupervisedClassifierNode(ClassificationTreeNode):
     
     @property
     def data(self):
-        return self.src_data[self.idx, :]
+        return self.src_data.iloc[self.idx]
     
     @property
     def targets(self):
-        return self.src_targets[self.idx]
+        return self.src_targets.iloc[self.idx]
 
     @cached_property
     def probabilities(self):
@@ -290,6 +296,8 @@ def draw_instance(constraints, generator, max_attempts=100):
         if all([c.test(instance) for c in constraints]):
             return instance
     
+    logger.critical('Could not generate an acceptable sample within a reasonable time.')
+    logger.debug(f'Failed to generate a sample for constraints: {constraints}')
     raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
 
 def same_distribution(data_1, data_2, feature_spec, alpha):
