@@ -25,12 +25,12 @@ with open("oldest") as fh:
 
 setup(
     name="generalizedtrees",
-    version="0.0.4",
+    version="0.0.5",
     author="Yuriy Sverchkov",
     author_email="yuriy.sverchkov@wisc.edu",
     description="Library for tree models: decision trees, model trees, mimic models, etc.",
     long_description=long_description,
-    long_description_content_type="text/markdown",
+    long_description_content_type="text/x-rst",
     license="Apache 2",
     keywords="machine learning decision trees model",
     url="https://github.com/Craven-Biostat-Lab/generalizedtrees",
