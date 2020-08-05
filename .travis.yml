@@ -10,13 +10,6 @@ matrix:
       install:
         - pip install -r oldest -r testing-requirements.txt
 
-    - name: "Using up to date packages with python 3.7"
-      python: "3.7"
-      script:
-        - pytest
-      install:
-        - pip install -r requirements.txt -r testing-requirements.txt
-
     - name: "Using up to date packages with python 3.8"
       python: "3.8"
       script:
