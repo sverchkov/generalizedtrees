@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.base import SplitTest, ClassificationTreeNode, TreeBuilder
+from generalizedtrees.base import SplitTest, ClassificationTreeNode, TreeBuilder, null_split
 from generalizedtrees.features import FeatureSpec
 from functools import cached_property, total_ordering
 from typing import Optional
@@ -80,16 +80,18 @@ class SupCferNodeBuilderMixin:
         # Note: this can be implemented without referencing tree_model or split.
         # Is that always the case?
 
-        # Get branching for training samples
-        branches = split.pick_branches(parent.data)
+        if split != null_split:
 
-        for b in np.unique(branches):
-            node = SupervisedClassifierNode(self.data, self.targets, self.target_classes)
-            node.idx = parent.idx[branches == b]
-            node.branch = split.constraints[b]
+            # Get branching for training samples
+            branches = split.pick_branches(parent.data)
 
-            logger.debug(f'Created node with subview {node.idx}')
-            yield node
+            for b in np.unique(branches):
+                node = SupervisedClassifierNode(self.data, self.targets, self.target_classes)
+                node.idx = parent.idx[branches == b]
+                node.branch = split.constraints[b]
+
+                logger.debug(f'Created node with subview {node.idx}')
+                yield node
 
 
 # For Oracle-and-Generator classifiers

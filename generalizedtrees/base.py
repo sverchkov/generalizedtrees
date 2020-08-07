@@ -72,7 +72,7 @@ class SplitTest(ABC):
         pass
 
 
-class NullSplit(SplitTest):
+class _NullSplit(SplitTest):
 
     def pick_branches(self, data_matrix):
         raise ValueError("Null split has no branches")
@@ -84,7 +84,10 @@ class NullSplit(SplitTest):
     def __repr__(self):
         return 'Null-split'
 
-null_split = NullSplit()
+    def __eq__(self, other):
+        return isinstance(other, _NullSplit)
+
+null_split = _NullSplit()
 
 
 class TreeBuilder(AbstractTreeBuilder, TreeModel):
