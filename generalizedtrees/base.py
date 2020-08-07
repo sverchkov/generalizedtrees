@@ -47,7 +47,7 @@ class AbstractTreeBuilder(ABC):
     """
 
     @abstractmethod
-    def _build(self):
+    def build(self):
         pass
 
     def prune(self): # Note: not abstract; no-op is a default pruning strategy
@@ -95,7 +95,7 @@ class TreeBuilder(AbstractTreeBuilder, TreeModel):
     Greedy tree building strategy
     """
 
-    def _build(self):
+    def build(self):
 
         root = self.create_root()
         self.tree = root.plant_tree()
@@ -108,7 +108,7 @@ class TreeBuilder(AbstractTreeBuilder, TreeModel):
             node = queue.pop()
             node.split = self.construct_split(node)
 
-            if node.split is not null_split:
+            if node.split != null_split:
                 for child in self.generate_children(node, node.split):
                     node.add_child(child)
                     if not self.local_stop(child):

@@ -48,7 +48,7 @@ def supervised_data_fit(
     tree_builder.data = data
     tree_builder.targets = targets
 
-    tree_builder._build()
+    tree_builder.build()
     tree_builder.prune()
 
     return tree_builder
@@ -85,7 +85,7 @@ def fit_with_data_and_oracle(
         tree_builder.targets = pd.Series(tree_builder.oracle(tree_builder.data))
 
     # Build the tree
-    tree_builder._build()
+    tree_builder.build()
     tree_builder.prune()
 
     return tree_builder

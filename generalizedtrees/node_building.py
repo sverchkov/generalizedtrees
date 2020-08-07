@@ -80,18 +80,16 @@ class SupCferNodeBuilderMixin:
         # Note: this can be implemented without referencing tree_model or split.
         # Is that always the case?
 
-        if split != null_split:
+        # Get branching for training samples
+        branches = split.pick_branches(parent.data)
 
-            # Get branching for training samples
-            branches = split.pick_branches(parent.data)
+        for b in np.unique(branches):
+            node = SupervisedClassifierNode(self.data, self.targets, self.target_classes)
+            node.idx = parent.idx[branches == b]
+            node.branch = split.constraints[b]
 
-            for b in np.unique(branches):
-                node = SupervisedClassifierNode(self.data, self.targets, self.target_classes)
-                node.idx = parent.idx[branches == b]
-                node.branch = split.constraints[b]
-
-                logger.debug(f'Created node with subview {node.idx}')
-                yield node
+            logger.debug(f'Created node with subview {node.idx}')
+            yield node
 
 
 # For Oracle-and-Generator classifiers
