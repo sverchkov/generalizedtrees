@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from abc.collections import Collection, Iterator
 from collections import deque
 from typing import Iterable, Any, List, NamedTuple, Union
 from logging import getLogger
@@ -102,40 +103,129 @@ class TreeNode:
         return self._tree[self._parent]
 
 
-class Tree:
+class Tree(Collection):
     """
     A container-like tree data structure.
-    Always meant to be initialized with a tree node.
     """
 
-    def __init__(self, node: TreeNode):
-        self._nodes = [node]
-        self._tree_depth = 0
+    class Node:
+
+        def __init__(self, tree: Tree, index: int, item: Any, depth: int, parent: int):
+            self.tree = tree
+            self.item = item
+            self._depth = depth,
+            self._parent = parent
+            self._index = index
+            self._children = []
+        
+        def parent(self):
+            return self.tree.node(self._parent)
+
+        @property
+        def depth(self):
+            return self._depth
+        
+        @property
+        def is_root(self) -> bool:
+            return self._depth == 0
+
+        @property
+        def is_leaf(self) -> bool:
+            return not self._children
+
+        def __len__(self) -> int:
+            return len(self._children)
+
+        def __getitem__(self, key):
+            """
+            We use slices to access child nodes
+            """
+            try:
+                return self.tree.node(self._children[key])
+            except:
+                logger.fatal(
+                    'Something went wrong in getting a child node:\n'
+                    f'key: {key}\n'
+                    f'index of calling node: {self._index}\n'
+                    f'indices of children: {self._children}\n'
+                    f'tree size: {len(self.tree._nodes)}\n')
+                raise
+
+    def __init__(self):
+        self._nodes = []
+        self._tree_depth = -1
 
     @property
     def depth(self) -> int:
         return self._tree_depth
 
-    @property
-    def size(self) -> int:
-        return len(self._nodes)
-
     def __len__(self) -> int:
         return len(self._nodes)
 
-    def __getitem__(self, key) -> Union[TreeNode, Iterable[TreeNode]]:
+    def _index(self, key):
+        k = 0 if key == 'root' else key
+        if isinstance(k, int) and k >=0 and k < len(self._nodes):
+            return k
+        else:
+            raise IndexError(f'Key {key} is out of bounds for tree of size {len(self._nodes)}')
 
-        if key == 'root':
-            return self._nodes[0]
-        
-        if isinstance(key, int) or isinstance(key, slice):
-            return self._nodes[key]
+    def __getitem__(self, key):
+        return self._nodes[self._index(key)].item
 
-        return [self._nodes[i] for i in key]
+    def node(self, key):
+        return self._nodes[self._index(key)]
 
     @property
-    def root(self) -> TreeNode:
-        return self._nodes[0]
+    def root(self):
+        return self.node(0)
+    
+    def add_node(self, item, parent_key=-1):
+        if parent_key < 0:
+            if self:
+                raise ValueError('Attempted to replace existing root node.')
+            else:
+                self._nodes.append(Tree.Node(self, 0, item, 0, -1))
+                self._tree_depth = 0
+        else:
+            self.add_children([item], parent_key)
+
+    def add_children(self, items, parent_key):
+
+        # Check parent index
+        parent_key = self._index(parent_key)
+
+        # Get parent node object
+        parent: Tree.Node = self._nodes[parent_key]
+
+        # Determine depth of child nodes
+        depth = parent.depth + 1
+
+        # Determine child indeces in nodes array
+        indeces = range(len(self._nodes), len(self._nodes)+len(items))
+
+        # Create child nodes and add to nodes array
+        self._nodes.extend(
+            Tree.Node(self, index, item, depth, parent_key)
+            for index, item in zip(indeces, items))
+        
+        # Register children with parent
+        parent._children.extend(indeces)
+
+        # Update tree depth
+        if depth > self._tree_depth:
+            self._tree_depth = depth
+    
+    def __iter__(self):
+        """
+        Depth-first iteration
+        """
+        if (self):
+            stack = deque([0])
+
+            while stack:
+                n = stack.pop()
+                stack.extend(self._nodes[n]._children)
+                yield self._nodes[n].item
 
 
 def tree_to_str(tree: Tree, content_str = lambda x: str(x)) -> str:
