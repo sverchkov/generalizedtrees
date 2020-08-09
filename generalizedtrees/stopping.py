@@ -22,12 +22,12 @@ def never(*args):
 ## Local stopping criteria
 
 def perfect_classification(self, node):
-    return node.probabilities.max() >= 1
+    return node.item.probabilities.max() >= 1
 
 def node_depth(tree_model, node):
     return node.depth >= tree_model.max_depth
 
 ## Global stopping criteria
 
-def tree_size_limit(self):
-    return self.tree.size >= self.max_tree_size
+def tree_size_limit(self, tree):
+    return tree.size >= self.max_tree_size

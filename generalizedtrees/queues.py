@@ -14,10 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Protocol, TypeVar
+from abc import abstractmethod
 from heapq import heappush, heappop
 from collections import deque
 
-class Heap(list):
+T = TypeVar('T')
+
+class CanPushPop(Protocol[T]): # TODO: Name better.
+
+    @abstractmethod
+    def push(self, item: T):
+        raise NotImplementedError
+
+    @abstractmethod
+    def pop(self) -> T:
+        raise NotImplementedError
+
+class Heap(list, CanPushPop):
 
     def push(self, item):
         heappush(self, item)
@@ -25,7 +39,7 @@ class Heap(list):
     def pop(self):
         return heappop(self)
 
-class Stack(deque):
+class Stack(deque, CanPushPop):
 
     def push(self, item):
         self.append(item)

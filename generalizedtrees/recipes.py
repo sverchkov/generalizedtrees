@@ -16,7 +16,6 @@
 
 from dataclasses import field
 from generalizedtrees.composing import greedy_classification_tree_learner
-from generalizedtrees.base import TreeBuilder
 from generalizedtrees.fitters import supervised_data_fit, fit_with_data_and_oracle
 from generalizedtrees.splitters import information_gain, make_split_candidates
 from generalizedtrees.queues import Stack, Heap

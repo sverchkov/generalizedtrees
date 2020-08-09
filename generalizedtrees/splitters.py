@@ -15,16 +15,11 @@
 # limitations under the License.
 
 
-from generalizedtrees.features import FeatureSpec
-from generalizedtrees.base import ClassificationTreeNode, SplitTest, null_split
-from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
-from generalizedtrees.scores import entropy
-from functools import cached_property
-from statistics import mode
-from typing import List, Optional
 import numpy as np
-import pandas as pd
 from logging import getLogger
+from generalizedtrees.scores import entropy
+from generalizedtrees.splitting import fayyad_thresholds, one_vs_all
+from generalizedtrees.features import FeatureSpec
 
 logger = getLogger()
 

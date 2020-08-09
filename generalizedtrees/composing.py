@@ -16,10 +16,16 @@
 
 from typing import Type, Any
 from dataclasses import make_dataclass
-from generalizedtrees.base import TreeBuilder, TreeClassifierMixin, null_split
+from generalizedtrees.base import GreedyTreeBuilder, null_split
+from generalizedtrees.classification import TreeClassifierMixin
+from generalizedtrees.tree import tree_to_str
 from logging import getLogger
 
 logger = getLogger()
+
+# Show tree
+def show_tree(model_obj):
+    return tree_to_str(model_obj.tree)
 
 # Composing a split constructor
 
@@ -66,7 +72,7 @@ def greedy_classification_tree_learner(
     data_generator = None # Function, optional. Takes training data and outputs f(constraints, n) -> data
     ):
 
-    bases = (node_building, TreeClassifierMixin, TreeBuilder)
+    bases = (node_building, TreeClassifierMixin, GreedyTreeBuilder)
 
     members = dict(
         fit=fitter,
@@ -75,7 +81,8 @@ def greedy_classification_tree_learner(
             split_candidate_generator,
             split_score),
         global_stop=global_stop,
-        local_stop=local_stop
+        local_stop=local_stop,
+        show_tree=show_tree
     )
 
     if data_generator is not None:

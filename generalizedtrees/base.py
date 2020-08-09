@@ -15,31 +15,14 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-from generalizedtrees.tree import tree_to_str, Tree, TreeNode
-from typing import Optional, Tuple
+from generalizedtrees.tree import tree_to_str, Tree
+from generalizedtrees.queues import CanPushPop
+from typing import Protocol, Optional, Tuple, Any, Iterator
 import numpy as np
 import pandas as pd
 
 
-class TreeModel:
-    """
-    Base class for tree models.
-
-    Just ensures the presence of a tree member.
-    """
-
-    def __init__(self):
-        self.tree: Optional[Tree] = None
-
-    def show_tree(self) -> str:
-
-        if self.tree is None:
-            "Uninitialized tree model"
-
-        return(tree_to_str(self.tree))
-
-
-class AbstractTreeBuilder(ABC):
+class AbstractTreeBuilder(Protocol):
     """
     Abstract class for tree builders.
 
@@ -47,14 +30,14 @@ class AbstractTreeBuilder(ABC):
     """
 
     @abstractmethod
-    def build(self):
-        pass
+    def build_tree(self) -> Tree:
+        raise NotImplementedError
 
-    def prune(self): # Note: not abstract; no-op is a default pruning strategy
-        pass
+    def prune_tree(self, tree) -> Tree: # Note: not abstract; no-op is a default pruning strategy
+        return tree
 
 
-class SplitTest(ABC):
+class SplitTest(Protocol):
     """
     Base abstract class for splits.
 
@@ -63,18 +46,20 @@ class SplitTest(ABC):
     """
 
     @abstractmethod
-    def pick_branches(self, data_matrix):
-        pass
+    def pick_branches(self, data_frame):
+        raise NotImplementedError
+
 
     @property
     @abstractmethod
     def constraints(self):
-        pass
+        raise NotImplementedError
+
 
 
 class _NullSplit(SplitTest):
 
-    def pick_branches(self, data_matrix):
+    def pick_branches(self, data_frame):
         raise ValueError("Null split has no branches")
 
     @property
@@ -90,123 +75,54 @@ class _NullSplit(SplitTest):
 null_split = _NullSplit()
 
 
-class TreeBuilder(AbstractTreeBuilder, TreeModel):
+class GreedyTreeBuilder(AbstractTreeBuilder):
     """
     Greedy tree building strategy
     """
 
-    def build(self):
+    def build_tree(self):
 
         root = self.create_root()
-        self.tree = root.plant_tree()
+        tree = Tree([root])
 
         queue = self.new_queue()
-        queue.push(root)
+        queue.push((root, 'root'))
 
-        while queue and not self.global_stop():
+        while queue and not self.global_stop(tree):
 
-            node = queue.pop()
+            node, ptr = queue.pop()
             node.split = self.construct_split(node)
 
             if node.split != null_split:
-                for child in self.generate_children(node, node.split):
-                    node.add_child(child)
-                    if not self.local_stop(child):
-                        queue.push(child)
-    
-    def prune(self):
-        pass
-    
-    @abstractmethod
-    def create_root(self) -> TreeNode:
-        pass
-
-    @abstractmethod
-    def generate_children(self, parent, split):
-        pass
-
-    @abstractmethod
-    def new_queue(self):
-        pass
-
-    @abstractmethod
-    def construct_split(self, node):
-        pass
-
-    @abstractmethod
-    def global_stop(self):
-        pass
-
-    @abstractmethod
-    def local_stop(self, node):
-        pass
-
-
-class ClassificationTreeNode(TreeNode):
-    """
-    Mixin implementing classification tree node logic.
-
-    Class must have a 'split' field deriving from SplitTest.
-    """
-    def __init__(self):
-        super().__init__()
-        self.split: SplitTest
-
-    def node_proba(self, data_matrix):
-        raise NotImplementedError
-
-    def _predict_subtree_proba(self, data_frame, idx, result_matrix):
-        """
-        Workhorse for predicting probabilities according to the built tree.
-
-        data_frame: a pandas(-like) dataframe
-        idx: a numpy array of numeric instance indexes
-        result_matrix: a numpy matrix of probabilities
-        """
-
-        if self.is_leaf:
-            result_matrix[idx,:] = self.node_proba(data_frame.iloc[idx])
+                for child in self.generate_children(node):
+                    child_ptr = tree.add_node(child, parent_key=ptr)
+                    if not self.local_stop(tree.node(child_ptr)):
+                        queue.push((child, child_ptr))
         
-        else:
-            branches = self.split.pick_branches(data_frame.iloc[idx])
-            for b in np.unique(branches):
-                self[b]._predict_subtree_proba(data_frame, idx[branches==b], result_matrix)
-
-        return result_matrix
-
-
-class TreeClassifierMixin(TreeModel):
-    """
-    The tree classifier mixin defines the logic of producing a classification using
-    a decision tree.
+        return tree
     
-    The tree (self.tree) should be used with a tree 'planted' from a subclass of
-    ClassificationTreeNode, or something that monkeys it. That is where actual branching
-    logic and prediction happens.
-    The prediction functions also require a `target_classes` field/property to be defined.
-    """
+    @abstractmethod
+    def create_root(self) -> Any:
+        pass
 
-    def predict_proba(self, data_matrix):
+    @abstractmethod
+    def generate_children(self, parent) -> Iterator:
+        pass
 
-        if self.tree is None:
-            raise ValueError("Attempted to predict without an initialized tree.")
+    @abstractmethod
+    def new_queue(self) -> CanPushPop:
+        pass
 
-        n = data_matrix.shape[0]
-        k = len(self.target_classes)
+    @abstractmethod
+    def construct_split(self, node) -> SplitTest:
+        pass
 
-        result = np.empty((n, k), dtype=np.float)
+    @abstractmethod
+    def global_stop(self, tree: Tree) -> bool:
+        pass
 
-        return pd.DataFrame(
-            self.tree.root._predict_subtree_proba(
-                data_matrix,
-                np.arange(n, dtype=np.intp),
-                result),
-            columns=self.target_classes,
-            copy=False)
+    @abstractmethod
+    def local_stop(self, node) -> bool:
+        pass
 
-    def predict(self, data_matrix):
 
-        if not isinstance(data_matrix, pd.DataFrame):
-            data_matrix = pd.DataFrame(data_matrix)
-
-        return self.predict_proba(data_matrix).idxmax(axis=1)

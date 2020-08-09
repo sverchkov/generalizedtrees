@@ -20,11 +20,7 @@ from generalizedtrees.features import FeatureSpec, infer_feature_spec
 import pandas as pd
 import numpy as np
 
-def supervised_data_fit(
-    tree_builder: AbstractTreeBuilder,
-    data: np.ndarray,
-    targets: np.ndarray,
-    **kwargs):
+def supervised_data_fit(tree_builder: AbstractTreeBuilder, data, targets, **kwargs):
 
     # So far just blindly accepting kwargs. A little hacky.
     tree_builder.__dict__.update(kwargs)
@@ -48,8 +44,8 @@ def supervised_data_fit(
     tree_builder.data = data
     tree_builder.targets = targets
 
-    tree_builder.build()
-    tree_builder.prune()
+    tree_builder.tree = tree_builder.build_tree()
+    tree_builder.tree = tree_builder.prune_tree(tree_builder.tree)
 
     return tree_builder
 
@@ -85,7 +81,7 @@ def fit_with_data_and_oracle(
         tree_builder.targets = pd.Series(tree_builder.oracle(tree_builder.data))
 
     # Build the tree
-    tree_builder.build()
-    tree_builder.prune()
+    tree_builder.build_tree()
+    tree_builder.prune_tree()
 
     return tree_builder

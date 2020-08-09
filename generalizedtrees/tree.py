@@ -136,7 +136,7 @@ class Tree(Collection):
         return self.node(0)
     
     def add_node(self, item, parent_key=-1) -> int:
-        if parent_key < 0:
+        if parent_key == -1:
             if self._nodes:
                 raise ValueError('Attempted to replace existing root node.')
             else:

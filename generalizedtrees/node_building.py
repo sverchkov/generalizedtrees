@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.base import SplitTest, ClassificationTreeNode, TreeBuilder, null_split
+from generalizedtrees.base import SplitTest, GreedyTreeBuilder, null_split
 from generalizedtrees.features import FeatureSpec
 from functools import cached_property, total_ordering
 from typing import Optional
@@ -27,7 +27,7 @@ logger = getLogger()
 
 # For supervised classifiers
 
-class SupervisedClassifierNode(ClassificationTreeNode):
+class SupervisedClassifierNode:
 
     def __init__(self, data, targets, target_classes):
         """
@@ -64,7 +64,7 @@ class SupervisedClassifierNode(ClassificationTreeNode):
         return pd.DataFrame([self.probabilities] * n)
     
     def __str__(self):
-        if self.is_leaf:
+        if self.split is None or self.split == null_split:
             return f'Predict {dict(self.probabilities)}'
         else:
             return str(self.split)
@@ -76,17 +76,17 @@ class SupCferNodeBuilderMixin:
         node.idx = np.arange(node.src_data.shape[0], dtype=np.intp)
         return node
 
-    def generate_children(self, parent, split):
+    def generate_children(self, parent):
         # Note: this can be implemented without referencing tree_model or split.
         # Is that always the case?
 
         # Get branching for training samples
-        branches = split.pick_branches(parent.data)
+        branches = parent.split.pick_branches(parent.data)
 
         for b in np.unique(branches):
             node = SupervisedClassifierNode(self.data, self.targets, self.target_classes)
             node.idx = parent.idx[branches == b]
-            node.branch = split.constraints[b]
+            node.branch = parent.split.constraints[b]
 
             logger.debug(f'Created node with subview {node.idx}')
             yield node
@@ -95,7 +95,7 @@ class SupCferNodeBuilderMixin:
 # For Oracle-and-Generator classifiers
 
 @total_ordering
-class OGClassifierNode(ClassificationTreeNode):
+class OGClassifierNode:
 
     def __init__(
         self,
