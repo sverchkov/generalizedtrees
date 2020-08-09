@@ -14,43 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.tree import TreeNode, tree_to_str
+def test_tree_building(caplog):
+    from logging import getLogger
+    from generalizedtrees.tree import Tree, tree_to_str
 
-def test_tree_building():
+    logger = getLogger()
 
-    class CharNode(TreeNode):
-
-        def __init__(self, label):
-            self.label = label
-            super().__init__()
-
-        def __str__(self):
-            return self.label
+    t = Tree(['A', ['B', ['H'], ['I']], ['C', 'E', 'F', 'G'], 'D'])
     
-    
-    r = CharNode("A")
-    t = r.plant_tree()
-
-    r.add_child(CharNode("B"))
-    r.add_child(CharNode("C"))
-    r.add_child(CharNode("D"))
-    r[1].add_child(CharNode("E"))
-    r[1].add_child(CharNode("F"))
-    r[1].add_child(CharNode("G"))
-    r[0].add_child(CharNode("H"))
-    r[0].add_child(CharNode("I"))
-
-    assert(len(t) == t.size)
-    assert(t.size == 9)
+    assert(len(t) == 9)
     assert(t.depth == 2)
 
-    print(t[:])
+    logger.info(f'Tree as list: {list(t)}')
 
-    print(tree_to_str(t))
-
-if __name__ == "__main__":
-    import logging
-    logger = logging.getLogger(__name__)
-    logging.basicConfig(level=5)
-
-    test_tree_building()
+    logger.info(f'Pretty-printed tree:\n{tree_to_str(t)}')

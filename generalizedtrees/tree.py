@@ -14,93 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc.collections import Collection, Iterator
+from collections.abc import Collection, Iterator
 from collections import deque
 from typing import Iterable, Any, List, NamedTuple, Union
 from logging import getLogger
 
 logger = getLogger()
-
-class TreeNode:
-    """
-    A base class for the nodes of a tree.
-    This class defines all the bookkeeping variables needed to maintain a tree.
-    Meant to be extended to classes that hold actual content at nodes.
-    """
-
-    def __init__(self, tree: 'Tree' = None, index: int = 0, parent: int = -1, depth: int = 0):
-
-        # Private members
-        self._tree: Tree = tree
-        self._index: int = index
-        self._child_index: int = -1
-        self._parent: int = parent
-        self._children: Iterable[int] = []
-        self._depth: int = depth
-
-    def plant_tree(self):
-        """
-        Make a tree rooted at this node.
-        This node becomes attached to the new tree.
-        """
-        #if self._tree is not None: raise some exception
-        self._tree = Tree(self)
-        return self._tree
-
-    @property
-    def depth(self) -> int:
-        return self._depth
-
-    @property
-    def tree(self) -> 'Tree':
-        # if self._tree is None: raise some exception
-        return self._tree
-
-    @property
-    def is_root(self) -> bool:
-        return self.depth == 0
-
-    @property
-    def is_leaf(self) -> bool:
-        return not self._children
-
-    def __len__(self) -> int:
-        return len(self._children)
-
-    def __getitem__(self, key) -> Union['TreeNode', Iterable['TreeNode']]:
-        """
-        We use slices to access child nodes
-        """
-        try:
-            return self._tree[self._children[key]]
-        except:
-            logger.fatal(
-                'Something went wrong in getting a child node:\n'
-                f'key: {key}\n'
-                f'index of calling node: {self._index}\n'
-                f'indices of children: {self._children}\n'
-                f'tree size: {len(self._tree._nodes)}\n')
-            raise
-
-    def add_child(self, child: 'TreeNode'):
-        # TODO: Add check that child isn't already in some tree
-        # TODO: Add check that child doesn't have children set
-        child._tree = self._tree
-        child._children = []
-        child._parent = self._index
-        n = len(self._tree)
-        child._index = n
-        child._child_index = len(self._children)
-        self._children.append(n)
-        self._tree._nodes.append(child)
-        d = self._depth + 1
-        child._depth = d
-        if self._tree.depth < d:
-            self._tree._tree_depth = d
-    
-    @property
-    def parent(self):
-        return self._tree[self._parent]
 
 
 class Tree(Collection):
@@ -110,10 +29,10 @@ class Tree(Collection):
 
     class Node:
 
-        def __init__(self, tree: Tree, index: int, item: Any, depth: int, parent: int):
+        def __init__(self, tree: 'Tree', index: int, item: Any, depth: int, parent: int):
             self.tree = tree
             self.item = item
-            self._depth = depth,
+            self._depth = depth
             self._parent = parent
             self._index = index
             self._children = []
@@ -151,9 +70,32 @@ class Tree(Collection):
                     f'tree size: {len(self.tree._nodes)}\n')
                 raise
 
-    def __init__(self):
+    def __init__(self, contents = []):
+        """
+        Create a tree
+
+        contents: heterogeneous iterable specifying the tree. The list is interpreted as
+        follows:
+            - The first item is the item at the root
+            - Subsequent items are subtrees following the same convention.
+            i.e. ['A', ['B', ['D']], ['C']] would initialize a tree with root
+            'A', children 'B' and 'C', and 'D' as a child of 'B'.
+            - Enclosing list may be omitted for leaves.
+        """
         self._nodes = []
         self._tree_depth = -1
+
+        # Populate tree
+        if not isinstance(contents, Iterable) or contents:
+            stack = deque([(-1, contents)])
+            while stack:
+                parent, subtree = stack.pop()
+                if not isinstance(subtree, Iterable):
+                    self.add_node(subtree, parent)
+                else:
+                    it = iter(subtree)
+                    index = self.add_node(next(it), parent)
+                    stack.extend((index, subtr) for subtr in it)
 
     @property
     def depth(self) -> int:
@@ -162,37 +104,54 @@ class Tree(Collection):
     def __len__(self) -> int:
         return len(self._nodes)
 
-    def _index(self, key):
+    def _single_index(self, key):
+        return isinstance(key, int) or key == 'root' 
+
+    def _1index(self, key):
         k = 0 if key == 'root' else key
         if isinstance(k, int) and k >=0 and k < len(self._nodes):
             return k
         else:
-            raise IndexError(f'Key {key} is out of bounds for tree of size {len(self._nodes)}')
+            raise IndexError(
+                f'Key {key} is out of bounds for tree of '
+                f'size {len(self._nodes)} or is not a single value.')
 
     def __getitem__(self, key):
-        return self._nodes[self._index(key)].item
+        if self._single_index(key):
+            return self.node(key).item
+        else:
+            return (n.item for n in self.node(key))
 
     def node(self, key):
-        return self._nodes[self._index(key)]
+        if self._single_index(key):
+            return self._nodes[self._1index(key)]
+        elif isinstance(key, slice):
+            return self._nodes[key]
+        elif isinstance(key, Iterable):
+            return (self._nodes[self._1index(k)] for k in key)
+        raise TypeError(f'Tree indices must be strings, integers, slices, or iterable')
 
     @property
     def root(self):
         return self.node(0)
     
-    def add_node(self, item, parent_key=-1):
+    def add_node(self, item, parent_key=-1) -> int:
         if parent_key < 0:
-            if self:
+            if self._nodes:
                 raise ValueError('Attempted to replace existing root node.')
             else:
                 self._nodes.append(Tree.Node(self, 0, item, 0, -1))
                 self._tree_depth = 0
         else:
             self.add_children([item], parent_key)
+        
+        # Assuming that node was ended to the end
+        return len(self._nodes)-1
 
     def add_children(self, items, parent_key):
 
         # Check parent index
-        parent_key = self._index(parent_key)
+        parent_key = self._1index(parent_key)
 
         # Get parent node object
         parent: Tree.Node = self._nodes[parent_key]
@@ -227,6 +186,9 @@ class Tree(Collection):
                 stack.extend(self._nodes[n]._children)
                 yield self._nodes[n].item
 
+    def __contains__(self, item):
+        return any(item is node.item or item == node.item for node in self._nodes)
+
 
 def tree_to_str(tree: Tree, content_str = lambda x: str(x)) -> str:
 
@@ -244,7 +206,7 @@ def tree_to_str(tree: Tree, content_str = lambda x: str(x)) -> str:
     while stack:
 
         node = stack.pop()
-        stack.extend(reversed(node[:]))
+        stack.extend(node[:])
         continuing[node.depth] += len(node)
 
         if node.depth > 0:
@@ -253,7 +215,7 @@ def tree_to_str(tree: Tree, content_str = lambda x: str(x)) -> str:
             continuing[node.depth-1] -= 1
             result += mid_branch if continuing[node.depth-1] else last_branch
         
-        result += content_str(node)
+        result += content_str(node.item)
         if stack:
             result += endline
     
