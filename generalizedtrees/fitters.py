@@ -81,7 +81,7 @@ def fit_with_data_and_oracle(
         tree_builder.targets = pd.Series(tree_builder.oracle(tree_builder.data))
 
     # Build the tree
-    tree_builder.build_tree()
-    tree_builder.prune_tree()
+    tree_builder.tree = tree_builder.build_tree()
+    tree_builder.tree = tree_builder.prune_tree(tree_builder.tree)
 
     return tree_builder

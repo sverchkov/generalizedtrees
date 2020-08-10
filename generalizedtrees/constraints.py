@@ -14,18 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Protocol
 from abc import ABC, abstractmethod
 from enum import Flag, auto
 import numpy as np
 
 
-class Constraint(ABC):
+class Constraint(Protocol):
 
     @abstractmethod
-    def test(self, sample):
+    def test(self, sample) -> bool:
         pass
 
-    def __invert__(self):
+    def __invert__(self) -> 'Constraint':
         return NegatedConstraint(self)
 
 

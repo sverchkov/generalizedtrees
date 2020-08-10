@@ -15,6 +15,9 @@
 # limitations under the License.
 
 
+from generalizedtrees.tree import Tree
+
+
 ## General stopping criteria
 def never(*args):
     return False
@@ -29,5 +32,5 @@ def node_depth(tree_model, node):
 
 ## Global stopping criteria
 
-def tree_size_limit(self, tree):
-    return tree.size >= self.max_tree_size
+def tree_size_limit(self, tree: Tree):
+    return len(tree) >= self.max_tree_size

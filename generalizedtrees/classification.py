@@ -79,7 +79,7 @@ class TreeClassifierMixin:
         self.target_classes: SizedIterable
 
     def predict_proba(self, data_frame):
-        predict_proba(self.tree, data_frame, self.target_classes)
+        return predict_proba(self.tree, data_frame, self.target_classes)
     
     def predict(self, data_frame):
-        predict(self.tree, data_frame, self.target_classes)
+        return predict(self.tree, data_frame, self.target_classes)

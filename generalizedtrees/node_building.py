@@ -14,14 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.base import SplitTest, GreedyTreeBuilder, null_split
-from generalizedtrees.features import FeatureSpec
+from typing import Optional, Tuple, Callable, Any
 from functools import cached_property, total_ordering
-from typing import Optional
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 from logging import getLogger
 from scipy.stats import ks_2samp, chisquare
+
+from generalizedtrees.base import SplitTest, GreedyTreeBuilder, null_split
+from generalizedtrees.features import FeatureSpec
+from generalizedtrees.constraints import Constraint
 
 logger = getLogger()
 
@@ -95,29 +99,18 @@ class SupCferNodeBuilderMixin:
 # For Oracle-and-Generator classifiers
 
 @total_ordering
+@dataclass(init=True, repr=True, eq=False, order=False)
 class OGClassifierNode:
 
-    def __init__(
-        self,
-        training_data,
-        training_target_proba,
-        training_idx,
-        oracle,
-        min_samples):
-
-        super().__init__()
-        self.local_constraint = None
-        self.min_samples = min_samples
-        self.split: Optional[SplitTest] = None 
-        self._src_training_data = training_data
-        self._src_training_target_proba = training_target_proba
-        self.training_idx = training_idx
-        self.generator = None
-        # self.prediction_proba: pd.Series
-        self.coverage = None
-        # self.score = None
-        self.d = self._src_training_data.shape[1]
-        self.oracle = oracle
+    training_data: pd.DataFrame
+    training_target_proba: pd.DataFrame
+    local_constraint: Optional[Constraint]
+    constraints: Tuple[Constraint]
+    gen_data: pd.DataFrame
+    gen_target_proba: pd.DataFrame
+    coverage: float
+    generator: Any
+    split: Optional[SplitTest] = None
 
     def __eq__(self, other):
         if self.score is None or other.score is None:
@@ -132,45 +125,10 @@ class OGClassifierNode:
             return self.score < other.score
     
     def __str__(self):
-        if self.is_leaf:
+        if self.split is None or self.split == null_split:
             return f'Predict {dict(self.probabilities)}'
         else:
             return str(self.split)
-    
-    @cached_property
-    def training_data(self):
-        return self._src_training_data.iloc[self.training_idx, :]
-
-    @cached_property
-    def training_target_proba(self):
-        return self._src_training_target_proba.iloc[self.training_idx, :]
-
-    @cached_property
-    def gen_data(self):
-        return draw_sample(
-            self.constraints,
-            self.min_samples - len(self.training_idx),
-            self._src_training_data.columns,
-            self.generator)
-
-    @cached_property
-    def gen_target_proba(self):
-
-        if self.gen_data.shape[0] < 1:
-            return pd.DataFrame(columns=self._src_training_target_proba.columns)
-        
-        else:
-            result = self.oracle(self.gen_data)
-            if not isinstance(result, pd.DataFrame):
-                result = pd.DataFrame(result)
-            return result
-    
-    @cached_property
-    def constraints(self):
-        if self.is_root:
-            return ()
-        else:
-            return self.parent.constraints + (self.local_constraint, )
 
     @cached_property
     def probabilities(self):
@@ -212,6 +170,18 @@ class OGClassifierNode:
             raise
 
 
+def safe_ask_oracle(data_frame, oracle, result_columns):
+
+    if data_frame.shape[0] < 1:
+        return pd.DataFrame(columns=result_columns)
+        
+    else:
+        result = oracle(data_frame)
+        if not isinstance(result, pd.DataFrame):
+            result = pd.DataFrame(result, columns=result_columns)
+        return result
+
+
 class OGCferNodeBuilderMixin:
     # Contract to formalize:
     # Requires parameters:
@@ -225,55 +195,84 @@ class OGCferNodeBuilderMixin:
 
     def create_root(self):
         target_proba = self.oracle(self.data)
+
         if not isinstance(target_proba, pd.DataFrame):
             target_proba = pd.DataFrame(target_proba)
-        root = OGClassifierNode(
-            self.data,
-            target_proba,
-            np.arange(self.data.shape[0], dtype=np.intp),
-            oracle=self.oracle,
-            min_samples=self.min_samples)
-        root.coverage = 1.0
+        
+        constraints = ()
+        generator = self.new_generator(self.data)
 
-        root.generator = self.new_generator(self.data)
+        gen_data = draw_sample(
+            constraints,
+            self.min_samples - len(self.data),
+            self.data.columns,
+            generator)
+        
+        return OGClassifierNode(
+            training_data=self.data,
+            training_target_proba=target_proba,
+            local_constraint=None,
+            constraints=constraints,
+            gen_data=gen_data,
+            gen_target_proba=safe_ask_oracle(gen_data, self.oracle, target_proba.columns),
+            coverage=1.0,
+            generator=generator)
 
-        return root
+    def generate_children(self, parent: OGClassifierNode):
 
-    def generate_children(self, parent: OGClassifierNode, split: SplitTest):
+        if parent.split is None: return
 
-        branches = split.pick_branches(parent.training_data)
-        gen_branches = split.pick_branches(parent.gen_data)
+        branches = parent.split.pick_branches(parent.training_data)
+        gen_branches = parent.split.pick_branches(parent.gen_data)
 
         unique_branches = np.unique(branches)
 
         if len(unique_branches) > 1:
 
             for b in unique_branches:
-                node = OGClassifierNode(
-                    parent._src_training_data,
-                    parent._src_training_target_proba,
-                    parent.training_idx[branches == b],
-                    self.oracle,
-                    self.min_samples)
 
-                node.local_constraint = split.constraints[b]
+                training_mask = branches == b
+                local_constraint = parent.split.constraints[b]
+                constraints = parent.constraints + (local_constraint,)
+                training_data = parent.training_data[training_mask]
 
                 # Compute coverage
-                node.coverage = \
-                    (len(node.training_idx) + sum(gen_branches == b)) / \
-                    (len(parent.training_idx) + len(gen_branches)) * \
+                coverage = \
+                    (sum(training_mask) + sum(gen_branches == b)) / \
+                    (len(training_mask) + len(gen_branches)) * \
                     parent.coverage
-                
+
+                # Make generator                
                 if same_distribution(
-                    node.training_data,
+                    training_data,
                     parent.training_data,
                     self.feature_spec,
                     self.dist_test_alpha):
-                    node.generator = parent.generator
-                else:
-                    node.generator = self.new_generator(node.training_data)
 
-                yield node
+                    generator = parent.generator
+
+                else:
+                    generator = self.new_generator(training_data)
+
+                # Generate data
+                gen_data = draw_sample(
+                    constraints,
+                    self.min_samples - len(training_data),
+                    self.data.columns,
+                    generator)
+
+                yield OGClassifierNode(
+                    training_data = training_data,
+                    training_target_proba = parent.training_target_proba[training_mask],
+                    local_constraint = local_constraint,
+                    constraints = constraints,
+                    gen_data = gen_data,
+                    gen_target_proba = safe_ask_oracle(
+                        gen_data,
+                        self.oracle,
+                        parent.training_target_proba.columns),
+                    coverage = coverage,
+                    generator = generator)
 
 
 # Utility functions (TODO: Find a better-named home)
