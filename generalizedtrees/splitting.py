@@ -167,7 +167,7 @@ def one_vs_all(data, feature):
         if category_dtype == column.dtype:
             values = column.cat.categories
         else:
-            values = column.unique
+            values = column.unique()
         
         feature_name = data.columns[feature]
     else:
