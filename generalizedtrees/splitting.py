@@ -20,6 +20,7 @@ import pandas as pd
 from functools import cached_property
 from generalizedtrees.base import SplitTest
 from generalizedtrees.constraints import LEQConstraint, GTConstraint, EQConstraint, NEQConstraint
+from generalizedtrees.features import category_dtype
 
 logger = logging.getLogger()
 
@@ -162,9 +163,12 @@ def one_vs_all(data, feature):
     """
 
     if isinstance(data, pd.DataFrame):
-        values = data.iloc[:,feature].unique()
-        if values.dtype == 'category':
-            values = values.cat.categories
+        column = data.iloc[:,feature]
+        if category_dtype == column.dtype:
+            values = column.cat.categories
+        else:
+            values = column.unique
+        
         feature_name = data.columns[feature]
     else:
         values = np.unique(data[:,feature])
