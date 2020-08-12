@@ -56,25 +56,6 @@ class SplitTest(Protocol):
         raise NotImplementedError
 
 
-
-class _NullSplit(SplitTest):
-
-    def pick_branches(self, data_frame):
-        raise ValueError("Null split has no branches")
-
-    @property
-    def constraints(self):
-        return ()
-    
-    def __repr__(self):
-        return 'Null-split'
-
-    def __eq__(self, other):
-        return isinstance(other, _NullSplit)
-
-null_split = _NullSplit()
-
-
 class GreedyTreeBuilder(AbstractTreeBuilder):
     """
     Greedy tree building strategy
@@ -93,7 +74,7 @@ class GreedyTreeBuilder(AbstractTreeBuilder):
             node, ptr = queue.pop()
             node.split = self.construct_split(node)
 
-            if node.split != null_split:
+            if node.split is not None:
                 for child in self.generate_children(node):
                     child_ptr = tree.add_node(child, parent_key=ptr)
                     if not self.local_stop(tree.node(child_ptr)):

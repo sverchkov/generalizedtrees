@@ -16,7 +16,7 @@
 
 from typing import Type, Any
 from dataclasses import make_dataclass
-from generalizedtrees.base import GreedyTreeBuilder, null_split
+from generalizedtrees.base import GreedyTreeBuilder
 from generalizedtrees.classification import TreeClassifierMixin
 from generalizedtrees.tree import tree_to_str
 from logging import getLogger
@@ -43,7 +43,7 @@ def compose_sample_based_split_constructor(
         feature_spec = tree_model.feature_spec
 
         split_candidates = split_candidate_generator(feature_spec, data, targets)
-        best_split = null_split
+        best_split = None
         best_split_score = 0
         for split in split_candidates:
             new_score = split_score(split, data, targets)

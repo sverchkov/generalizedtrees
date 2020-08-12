@@ -23,7 +23,7 @@ import pandas as pd
 from logging import getLogger
 from scipy.stats import ks_2samp, chisquare
 
-from generalizedtrees.base import SplitTest, GreedyTreeBuilder, null_split
+from generalizedtrees.base import SplitTest, GreedyTreeBuilder
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.constraints import Constraint
 
@@ -68,7 +68,7 @@ class SupervisedClassifierNode:
         return pd.DataFrame([self.probabilities] * n)
     
     def __str__(self):
-        if self.split is None or self.split == null_split:
+        if self.split is None:
             return f'Predict {dict(self.probabilities)}'
         else:
             return str(self.split)
@@ -125,7 +125,7 @@ class OGClassifierNode:
             return self.score < other.score
     
     def __str__(self):
-        if self.split is None or self.split == null_split:
+        if self.split is None:
             return f'Predict {dict(self.probabilities)}'
         else:
             return str(self.split)
