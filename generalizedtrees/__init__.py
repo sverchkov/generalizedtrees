@@ -1,1 +1,1 @@
-from generalizedtrees.recipes import Trepan, DecisionTreeClassifier
+from generalizedtrees.recipes import Trepan, TrepanV1, DecisionTreeClassifier

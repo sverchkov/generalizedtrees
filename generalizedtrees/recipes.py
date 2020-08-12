@@ -17,7 +17,7 @@
 from dataclasses import field
 from generalizedtrees.composing import greedy_classification_tree_learner
 from generalizedtrees.fitters import supervised_data_fit, fit_with_data_and_oracle
-from generalizedtrees.splitters import information_gain, make_split_candidates
+from generalizedtrees.splitters import information_gain, information_gain_p, make_split_candidates, make_split_candidates_p
 from generalizedtrees.queues import Stack, Heap
 from generalizedtrees.stopping import never, node_depth, tree_size_limit
 from generalizedtrees.node_building import SupCferNodeBuilderMixin, OGCferNodeBuilderMixin
@@ -37,7 +37,8 @@ DecisionTreeClassifier = greedy_classification_tree_learner(
     local_stop=node_depth
 )
 
-Trepan = greedy_classification_tree_learner(
+# Version of Trepan that uses hard target estimation for split scoring
+TrepanV1 = greedy_classification_tree_learner(
     name="Trepan",
     parameters=[
         ('use_m_of_n', bool, field(default=False)),
@@ -53,4 +54,24 @@ Trepan = greedy_classification_tree_learner(
     queue=Heap,
     global_stop=tree_size_limit,
     local_stop=never
+)
+
+# Version of Trepan that uses target probability estimates for split scoring
+Trepan = greedy_classification_tree_learner(
+    name="Trepan",
+    parameters=[
+        ('use_m_of_n', bool, field(default=False)),
+        ('max_tree_size', int, field(default=20)),
+        ('min_samples', int, field(default=100)),
+        ('dist_test_alpha', float, field(default=0.05))
+    ],
+    fitter=fit_with_data_and_oracle,
+    node_building=OGCferNodeBuilderMixin,
+    split_candidate_generator=make_split_candidates_p,
+    split_score=information_gain_p,
+    data_generator=trepan_generator,
+    queue=Heap,
+    global_stop=tree_size_limit,
+    local_stop=never,
+    use_proba=True
 )
