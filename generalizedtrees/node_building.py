@@ -29,9 +29,26 @@ from generalizedtrees.constraints import Constraint
 
 logger = getLogger()
 
+
+# Code common to node implementations
+
+class ProbabilisticClassifierNodeMixin:
+
+    def __str__(self):
+        if self.split is None:
+            return f'Predict {dict(self.probabilities)}'
+        else:
+            return str(self.split)
+    
+    def node_proba(self, data_matrix):
+        n = data_matrix.shape[0]
+
+        return pd.DataFrame([self.probabilities] * n)
+
+
 # For supervised classifiers
 
-class SupervisedClassifierNode:
+class SupervisedClassifierNode(ProbabilisticClassifierNodeMixin):
 
     def __init__(self, data, targets, target_classes):
         """
@@ -62,16 +79,6 @@ class SupervisedClassifierNode:
         freqs = pd.Series(self.targets).value_counts(normalize=True, sort=False)
         return slots.add(freqs, fill_value=0.0)
 
-    def node_proba(self, data_matrix):
-        n = data_matrix.shape[0]
-
-        return pd.DataFrame([self.probabilities] * n)
-    
-    def __str__(self):
-        if self.split is None:
-            return f'Predict {dict(self.probabilities)}'
-        else:
-            return str(self.split)
 
 class SupCferNodeBuilderMixin:
 
@@ -96,23 +103,12 @@ class SupCferNodeBuilderMixin:
             yield node
 
 
-class ProbabilisticClassifierNodeMixin:
-
-    def __str__(self):
-        if self.split is None:
-            return f'Predict {dict(self.probabilities)}'
-        else:
-            return str(self.split)
-    
-    def node_proba(self, data_matrix):
-        n = data_matrix.shape[0]
-
-        return pd.DataFrame([self.probabilities] * n)
+# Builder for trepan
 
 
-@total_ordering
+@order_by("score")
 @dataclass(init=True, repr=True, eq=False, order=False)
-class OGClassifierNode:
+class OGClassifierNode(ProbabilisticClassifierNodeMixin):
 
     training_data: pd.DataFrame
     training_target_proba: pd.DataFrame
@@ -123,24 +119,6 @@ class OGClassifierNode:
     coverage: float
     generate: Callable
     split: Optional[SplitTest] = None
-
-    def __eq__(self, other):
-        if self.score is None or other.score is None:
-            return False
-        else:
-            return self.score == other.score
-    
-    def __lt__(self, other):
-        if self.score is None or other.score is None:
-            raise ValueError("Unable to compare nodes with uninitialized scores")
-        else:
-            return self.score < other.score
-    
-    def __str__(self):
-        if self.split is None:
-            return f'Predict {dict(self.probabilities)}'
-        else:
-            return str(self.split)
 
     @cached_property
     def probabilities(self):
@@ -153,11 +131,6 @@ class OGClassifierNode:
     @cached_property
     def target_proba(self):
         return pd.concat([self.training_target_proba, self.gen_target_proba])
-
-    def node_proba(self, data_matrix):
-        n = data_matrix.shape[0]
-
-        return pd.DataFrame([self.probabilities] * n)
     
     @cached_property
     def score(self):
@@ -261,17 +234,17 @@ class OGCferNodeBuilderMixin:
                     self.feature_spec,
                     self.dist_test_alpha):
 
-                    generator = parent.generator
+                    generate = parent.generate
 
                 else:
-                    generator = self.new_generator(training_data)
+                    generate = self.new_generator(training_data)
 
                 # Generate data
                 gen_data = draw_sample(
                     constraints,
                     self.min_samples - len(training_data),
                     self.data.columns,
-                    generator)
+                    generate)
 
                 yield OGClassifierNode(
                     training_data = training_data,
@@ -284,7 +257,7 @@ class OGCferNodeBuilderMixin:
                         self.oracle,
                         parent.training_target_proba.columns),
                     coverage = coverage,
-                    generator = generator)
+                    generate = generate)
 
 
 # Utility functions (TODO: Find a better-named home)
