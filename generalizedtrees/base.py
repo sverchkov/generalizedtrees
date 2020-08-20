@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import total_ordering
 from abc import ABC, abstractmethod
 from generalizedtrees.tree import tree_to_str, Tree
 from generalizedtrees.queues import CanPushPop
@@ -107,3 +108,23 @@ class GreedyTreeBuilder(AbstractTreeBuilder):
         pass
 
 
+## Decorator for making a class orderable
+def order_by(cls, attrs):
+
+    def eq(self, other):
+        return all(getattr(self, a) == getattr(other, a) for a in attrs)
+    
+    def lt(self, other):
+
+        for a in attrs:
+            ours = getattr(self, a)
+            theirs = getattr(other, a)
+            if ours < theirs: return True
+            elif theirs > ours: return False
+        
+        return False
+    
+    setattr(cls, '__lt__', lt)
+    setattr(cls, '__eq__', eq)
+
+    return total_ordering(cls)

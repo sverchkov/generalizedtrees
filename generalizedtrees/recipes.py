@@ -20,8 +20,8 @@ from generalizedtrees.fitters import supervised_data_fit, fit_with_data_and_orac
 from generalizedtrees.splitters import information_gain, information_gain_p, make_split_candidates, make_split_candidates_p
 from generalizedtrees.queues import Stack, Heap
 from generalizedtrees.stopping import never, node_depth, tree_size_limit
-from generalizedtrees.node_building import SupCferNodeBuilderMixin, OGCferNodeBuilderMixin
-from generalizedtrees.data_generators import trepan_generator
+from generalizedtrees.node_building import SupCferNodeBuilderMixin, OGCferNodeBuilderMixin, BATNodeBuilderMixin
+from generalizedtrees.data_generators import trepan_generator, smearing
 
 DecisionTreeClassifier = greedy_classification_tree_learner(
     name="DecisionTreeClassifier",
@@ -71,6 +71,24 @@ Trepan = greedy_classification_tree_learner(
     split_score=information_gain_p,
     data_generator=trepan_generator,
     queue=Heap,
+    global_stop=tree_size_limit,
+    local_stop=never,
+    use_proba=True
+)
+
+# Born again trees
+BornAgain = greedy_classification_tree_learner(
+    name="BornAgain",
+    parameters=[
+        ('max_tree_size', int, field(default=20)),
+        ('min_samples', int, field(default=100))
+    ],
+    fitter=fit_with_data_and_oracle,
+    node_building=BATNodeBuilderMixin,
+    split_candidate_generator=make_split_candidates_p,
+    split_score=information_gain_p,
+    data_generator=smearing,
+    queue=Stack,
     global_stop=tree_size_limit,
     local_stop=never,
     use_proba=True

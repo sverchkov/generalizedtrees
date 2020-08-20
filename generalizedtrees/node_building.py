@@ -23,7 +23,7 @@ import pandas as pd
 from logging import getLogger
 from scipy.stats import ks_2samp, chisquare
 
-from generalizedtrees.base import SplitTest, GreedyTreeBuilder
+from generalizedtrees.base import order_by, SplitTest, GreedyTreeBuilder
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.constraints import Constraint
 
@@ -96,7 +96,19 @@ class SupCferNodeBuilderMixin:
             yield node
 
 
-# For Oracle-and-Generator classifiers
+class ProbabilisticClassifierNodeMixin:
+
+    def __str__(self):
+        if self.split is None:
+            return f'Predict {dict(self.probabilities)}'
+        else:
+            return str(self.split)
+    
+    def node_proba(self, data_matrix):
+        n = data_matrix.shape[0]
+
+        return pd.DataFrame([self.probabilities] * n)
+
 
 @total_ordering
 @dataclass(init=True, repr=True, eq=False, order=False)
@@ -109,7 +121,7 @@ class OGClassifierNode:
     gen_data: pd.DataFrame
     gen_target_proba: pd.DataFrame
     coverage: float
-    generator: Any
+    generate: Callable
     split: Optional[SplitTest] = None
 
     def __eq__(self, other):
@@ -200,13 +212,13 @@ class OGCferNodeBuilderMixin:
             target_proba = pd.DataFrame(target_proba)
         
         constraints = ()
-        generator = self.new_generator(self.data)
+        generate = self.new_generator(self.data)
 
         gen_data = draw_sample(
             constraints,
             self.min_samples - len(self.data),
             self.data.columns,
-            generator)
+            generate)
         
         return OGClassifierNode(
             training_data=self.data,
@@ -216,7 +228,7 @@ class OGCferNodeBuilderMixin:
             gen_data=gen_data,
             gen_target_proba=safe_ask_oracle(gen_data, self.oracle, target_proba.columns),
             coverage=1.0,
-            generator=generator)
+            generate=generate)
 
     def generate_children(self, parent: OGClassifierNode):
 
@@ -288,10 +300,10 @@ def draw_sample(constraints, n, columns, generator):
     else:
         return pd.DataFrame([draw_instance(constraints, generator) for _ in range(n)])
 
-def draw_instance(constraints, generator, max_attempts=1000):
+def draw_instance(constraints, generate, max_attempts=1000):
 
     for _ in range(max_attempts):
-        instance = generator.generate()
+        instance = generate()
         if all([c.test(instance) for c in constraints]):
             return instance
     
@@ -299,7 +311,7 @@ def draw_instance(constraints, generator, max_attempts=1000):
     logger.debug(f'Failed to generate a sample for constraints: {constraints}')
     raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
 
-def same_distribution(data_1, data_2, feature_spec, alpha):
+def same_distribution(data_1, data_2, /, feature_spec, alpha):
     """
     Performs statistical test to determine if data are from the
     same distribution.
@@ -343,3 +355,162 @@ def same_distribution(data_1, data_2, feature_spec, alpha):
             n_tests += 1
 
     return min_p < alpha/n_tests
+
+
+@dataclass(init=True, repr=True, eq=False, order=False)
+class BATNode(ProbabilisticClassifierNodeMixin):
+    data: pd.DataFrame
+    target_proba: pd.DataFrame
+    training_idx: np.ndarray
+    gen_idx: np.ndarray
+    local_constraint: Optional[Constraint]
+    constraints: Tuple[Constraint]
+    probabilities: pd.Series
+    cost: float
+    split: Optional[SplitTest] = None
+
+
+class BATNodeBuilderMixin:
+    """
+    Node builder following the scheme in Born-Again Trees.
+    """
+    # Contract to formalize:
+    # Requires parameters:
+    # - data
+    # - oracle
+    # - new_generator
+    # - same_distribution
+    # - min_samples
+    # - feature_spec
+    # - dist_test_alpha
+
+    def _fetch_sample(self, constraints, known_training_idx=None, known_gen_idx=None):
+        
+        if not hasattr(self, "_generate"):
+            self._generate = self.new_generator(self.data)
+        
+        if known_training_idx is None:
+            known_training_idx = np.array([
+                i for i in range(self.data.shape[0])
+                if all(c.test(self.data.iloc[i, :]) for c in constraints)
+            ], dtype=np.intp)
+        
+        if not hasattr(self, "_generated_samples"):
+
+            self._generated_samples = pd.DataFrame()
+            known_gen_idx = np.empty((0,), dtype=np.intp)
+
+        else:
+            if known_gen_idx is None:
+                known_gen_idx = np.array([
+                    i for i in range(self._generated_samples)
+                    if all(c.test(self._generated_samples[i, :]) for c in constraints)
+                ], dtype=np.intp)
+
+        # Generate new samples until min_samples is met for constraints
+        generated_samples = []
+        accepted_gen_idx = []
+        past_n_gen = len(self._generated_samples)
+        n_needed = self.min_samples - len(known_training_idx) - len(known_gen_idx)
+
+        while len(accepted_gen_idx) < n_needed:
+
+            new_sample = self._generate()
+
+            if all(c.test(new_sample) for c in constraints):
+                accepted_gen_idx.append(past_n_gen + len(generated_samples))
+            
+            generated_samples.append(new_sample)
+
+        if len(generated_samples) > 0:
+
+            self._generated_samples = self._generated_samples.append(generated_samples, ignore_index=True)
+            known_gen_idx = np.concatenate([known_gen_idx, np.array(accepted_gen_idx, dtype=np.intp)])
+        
+        prop_accepted = (
+            (self.data.shape[0] + self._generated_samples.shape[0])
+            / (len(known_training_idx) + len(known_gen_idx)))
+        
+        return (
+            self._generated_samples.iloc[known_gen_idx, :],
+            known_gen_idx,
+            known_training_idx,
+            prop_accepted)
+
+
+    def create_root(self):
+        self._target_proba = self.oracle(self.data)
+
+        if not isinstance(self._target_proba, pd.DataFrame):
+            self._target_proba = pd.DataFrame(self._target_proba)
+        
+        constraints = ()
+
+        gen_data, training_idx, gen_idx, prop_accepted = self._fetch_sample(constraints)
+
+        # Precompute probabilities
+        target_proba = pd.concat([
+            self._target_proba,
+            safe_ask_oracle(gen_data, self.oracle, self._target_proba.columns)
+            ], ignore_index=True)
+        probabilities = target_proba.mean(axis=0)
+
+        cost = prop_accepted * (1 - max(probabilities))
+        
+        return BATNode(
+            data=self.data.iloc[training_idx, :].append(gen_data, ignore_index=True),
+            target_proba=target_proba,
+            training_idx=training_idx,
+            gen_idx=gen_idx,
+            local_constraint=None,
+            constraints=constraints,
+            probabilities=probabilities,
+            cost=cost)
+
+    def generate_children(self, parent: OGClassifierNode):
+
+        if parent.split is None: return
+
+        branches = parent.split.pick_branches(self.data(parent.training_idx))
+        gen_branches = parent.split.pick_branches(self._generated_samples(parent.gen_idx))
+
+        unique_branches = np.unique(branches)
+
+        # Born again trees rule is not to split if not all branches are
+        # populated by training samples.
+        if len(unique_branches) < len(parent.split.constraints): return
+
+        for b in unique_branches:
+
+            training_mask = branches == b
+            local_constraint = parent.split.constraints[b]
+            constraints = parent.constraints + (local_constraint,)
+            training_idx = parent.training_idx[training_mask]
+
+            # Make use of parent generated instances if possible
+            gen_idx = parent.gen_idx[gen_branches == b]
+
+            # Generate data
+            gen_data, training_idx, gen_idx, prop_accepted = self._fetch_sample(
+                constraints,
+                training_idx,
+                gen_idx)
+
+            # Precompute probabilities
+            target_proba = pd.concat([
+                self._target_proba[training_idx],
+                safe_ask_oracle(gen_data, self.oracle, self._target_proba.columns)
+                ],ignore_index=True)
+            probabilities = target_proba.mean(axis=0)
+
+            cost = prop_accepted * (1 - max(probabilities))
+
+            yield BATNode(
+                data=self.data.iloc[training_idx, :].append(gen_data, ignore_index=True),
+                target_proba=target_proba,
+                training_idx=training_idx,
+                gen_idx=gen_idx,
+                local_constraint=local_constraint,
+                constraints=constraints,
+                probabilities=probabilities,
+                cost=cost)
