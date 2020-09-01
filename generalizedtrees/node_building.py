@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 from logging import getLogger
 from scipy.stats import ks_2samp, chisquare
+from sklearn.linear_model import LogisticRegression
 
 from generalizedtrees.base import order_by, SplitTest, GreedyTreeBuilder
 from generalizedtrees.features import FeatureSpec
@@ -487,3 +488,178 @@ class BATNodeBuilderMixin:
                 constraints=constraints,
                 probabilities=probabilities,
                 cost=cost)
+
+
+#########################################
+# Builder for trepan with linear leaves #
+#########################################
+
+
+@order_by("score")
+@dataclass(init=True, repr=True, eq=False, order=False)
+class TLLNode:
+
+    training_data: pd.DataFrame
+    training_target_proba: pd.DataFrame
+    local_constraint: Optional[Constraint]
+    constraints: Tuple[Constraint]
+    gen_data: pd.DataFrame
+    gen_target_proba: pd.DataFrame
+    coverage: float
+    generate: Callable
+    split: Optional[SplitTest] = None
+
+    def __str__(self):
+        if self.split is None:
+            return str(self.model)
+        else:
+            return str(self.split)
+    
+    def node_proba(self, data_matrix):
+        model = self.model
+        return pd.DataFrame(model.predict_proba(data_matrix), columns=model.classes_)
+
+    @cached_property
+    def model(self):
+
+        # TODO: Expose LR parameters to the outside
+        lr = LogisticRegression(penalty='l1', C=0.1, multi_class='multinomial', solver='saga')
+
+        # Prepare data for fit
+        # Use sample weights to communicate probabilities to the learner
+        p_y = self.target_proba
+        n, m = p_y.shape
+
+        lr_data = pd.concat([self.data]*m, axis=0, ignore_index=True)
+        lr_sample_weights = p_y.to_numpy(dtype=float).flatten()
+        lr_targets = np.repeat(p_y.columns.to_numpy(), n)
+
+        return lr.fit(lr_data, lr_targets, sample_weight=lr_sample_weights)
+
+    @cached_property
+    def classifier(self):
+        return self.target_proba.mean(axis=0)
+
+    @cached_property
+    def data(self):
+        return pd.concat([self.training_data, self.gen_data])
+    
+    @cached_property
+    def target_proba(self):
+        return pd.concat([self.training_target_proba, self.gen_target_proba])
+    
+    @cached_property
+    def score(self):
+        return -(self.coverage * (1 - self.fidelity))
+    
+    @cached_property
+    def fidelity(self):
+        return sum((self.target_proba * self.node_proba(self.data)).mean(axis=0))
+
+    @cached_property
+    def targets(self):
+        # For compatibility with split selectors that use targets
+        try:
+            return self.target_proba.idxmax(axis=1)
+        except:
+            logger.critical(
+                'Something went wrong when inferring hard target classes.'
+                'Target probability vector:'
+                f'\n{self.target_proba}')
+            raise
+
+
+# TODO:
+# TLLNodeBuilder turns out to be almost identical to OGClassifier
+# Figure out how to generalize.
+class TLLNodeBuilderMixin:
+    # Contract to formalize:
+    # Requires parameters:
+    # - data
+    # - oracle
+    # - new_generator
+    # - same_distribution
+    # - min_samples
+    # - feature_spec
+    # - dist_test_alpha
+
+    def create_root(self):
+        target_proba = self.oracle(self.data)
+
+        if not isinstance(target_proba, pd.DataFrame):
+            target_proba = pd.DataFrame(target_proba)
+        
+        constraints = ()
+        generate = self.new_generator(self.data)
+
+        gen_data = draw_sample(
+            constraints,
+            self.min_samples - len(self.data),
+            self.data.columns,
+            generate)
+        
+        return TLLNode(
+            training_data=self.data,
+            training_target_proba=target_proba,
+            local_constraint=None,
+            constraints=constraints,
+            gen_data=gen_data,
+            gen_target_proba=safe_ask_oracle(gen_data, self.oracle, target_proba.columns),
+            coverage=1.0,
+            generate=generate)
+
+    def generate_children(self, parent: OGClassifierNode):
+
+        if parent.split is None: return
+
+        branches = parent.split.pick_branches(parent.training_data)
+        gen_branches = parent.split.pick_branches(parent.gen_data)
+
+        unique_branches = np.unique(branches)
+
+        if len(unique_branches) > 1:
+
+            for b in unique_branches:
+
+                training_mask = branches == b
+                local_constraint = parent.split.constraints[b]
+                constraints = parent.constraints + (local_constraint,)
+                training_data = parent.training_data[training_mask]
+
+                # Compute coverage
+                coverage = \
+                    (sum(training_mask) + sum(gen_branches == b)) / \
+                    (len(training_mask) + len(gen_branches)) * \
+                    parent.coverage
+
+                # Make generator                
+                if same_distribution(
+                    training_data,
+                    parent.training_data,
+                    self.feature_spec,
+                    self.dist_test_alpha):
+
+                    generate = parent.generate
+
+                else:
+                    generate = self.new_generator(training_data)
+
+                # Generate data
+                gen_data = draw_sample(
+                    constraints,
+                    self.min_samples - len(training_data),
+                    self.data.columns,
+                    generate)
+
+                yield TLLNode(
+                    training_data = training_data,
+                    training_target_proba = parent.training_target_proba[training_mask],
+                    local_constraint = local_constraint,
+                    constraints = constraints,
+                    gen_data = gen_data,
+                    gen_target_proba = safe_ask_oracle(
+                        gen_data,
+                        self.oracle,
+                        parent.training_target_proba.columns),
+                    coverage = coverage,
+                    generate = generate)
