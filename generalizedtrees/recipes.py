@@ -99,13 +99,14 @@ BornAgain = greedy_classification_tree_learner(
 TLL = greedy_classification_tree_learner(
         name="TLL",
     parameters=[
+        ('node_cls', type, field(default=nb.TLLNode)),
         ('use_m_of_n', bool, field(default=False)),
         ('max_tree_size', int, field(default=20)),
         ('min_samples', int, field(default=100)),
         ('dist_test_alpha', float, field(default=0.05))
     ],
     fitter=fit_with_data_and_oracle,
-    node_building=nb.TLLNodeBuilderMixin,
+    node_building=nb.OGCferNodeBuilderMixin,
     split_candidate_generator=make_split_candidates_p,
     split_score=information_gain_p,
     data_generator=trepan_generator,

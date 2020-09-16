@@ -109,7 +109,7 @@ class SupCferNodeBuilderMixin:
 
 @order_by("score")
 @dataclass(init=True, repr=True, eq=False, order=False)
-class OGClassifierNode(ProbabilisticClassifierNodeMixin):
+class TrepanNode(ProbabilisticClassifierNodeMixin):
 
     training_data: pd.DataFrame
     training_target_proba: pd.DataFrame
@@ -178,8 +178,12 @@ class OGCferNodeBuilderMixin:
     # - min_samples
     # - feature_spec
     # - dist_test_alpha
+    # - node_cls (optional, defults to TrepanNode)
 
     def create_root(self):
+
+        Node = getattr(self, "node_cls", TrepanNode)
+
         target_proba = self.oracle(self.data)
 
         if not isinstance(target_proba, pd.DataFrame):
@@ -194,7 +198,7 @@ class OGCferNodeBuilderMixin:
             self.data.columns,
             generate)
         
-        return OGClassifierNode(
+        return Node(
             training_data=self.data,
             training_target_proba=target_proba,
             local_constraint=None,
@@ -204,8 +208,12 @@ class OGCferNodeBuilderMixin:
             coverage=1.0,
             generate=generate)
 
-    def generate_children(self, parent: OGClassifierNode):
+    def generate_children(self, parent):
 
+        # Design decision: 
+        # Infer child node classes from parent class. Seems most flexible.
+        Node = type(parent)
+        
         if parent.split is None: return
 
         branches = parent.split.pick_branches(parent.training_data)
@@ -247,7 +255,7 @@ class OGCferNodeBuilderMixin:
                     self.data.columns,
                     generate)
 
-                yield OGClassifierNode(
+                yield Node(
                     training_data = training_data,
                     training_target_proba = parent.training_target_proba[training_mask],
                     local_constraint = local_constraint,
@@ -441,7 +449,7 @@ class BATNodeBuilderMixin:
             probabilities=probabilities,
             cost=cost)
 
-    def generate_children(self, parent: OGClassifierNode):
+    def generate_children(self, parent):
 
         if parent.split is None: return
 
@@ -568,98 +576,3 @@ class TLLNode:
                 f'\n{self.target_proba}')
             raise
 
-
-# TODO:
-# TLLNodeBuilder turns out to be almost identical to OGClassifier
-# Figure out how to generalize.
-class TLLNodeBuilderMixin:
-    # Contract to formalize:
-    # Requires parameters:
-    # - data
-    # - oracle
-    # - new_generator
-    # - same_distribution
-    # - min_samples
-    # - feature_spec
-    # - dist_test_alpha
-
-    def create_root(self):
-        target_proba = self.oracle(self.data)
-
-        if not isinstance(target_proba, pd.DataFrame):
-            target_proba = pd.DataFrame(target_proba)
-        
-        constraints = ()
-        generate = self.new_generator(self.data)
-
-        gen_data = draw_sample(
-            constraints,
-            self.min_samples - len(self.data),
-            self.data.columns,
-            generate)
-        
-        return TLLNode(
-            training_data=self.data,
-            training_target_proba=target_proba,
-            local_constraint=None,
-            constraints=constraints,
-            gen_data=gen_data,
-            gen_target_proba=safe_ask_oracle(gen_data, self.oracle, target_proba.columns),
-            coverage=1.0,
-            generate=generate)
-
-    def generate_children(self, parent: OGClassifierNode):
-
-        if parent.split is None: return
-
-        branches = parent.split.pick_branches(parent.training_data)
-        gen_branches = parent.split.pick_branches(parent.gen_data)
-
-        unique_branches = np.unique(branches)
-
-        if len(unique_branches) > 1:
-
-            for b in unique_branches:
-
-                training_mask = branches == b
-                local_constraint = parent.split.constraints[b]
-                constraints = parent.constraints + (local_constraint,)
-                training_data = parent.training_data[training_mask]
-
-                # Compute coverage
-                coverage = \
-                    (sum(training_mask) + sum(gen_branches == b)) / \
-                    (len(training_mask) + len(gen_branches)) * \
-                    parent.coverage
-
-                # Make generator                
-                if same_distribution(
-                    training_data,
-                    parent.training_data,
-                    self.feature_spec,
-                    self.dist_test_alpha):
-
-                    generate = parent.generate
-
-                else:
-                    generate = self.new_generator(training_data)
-
-                # Generate data
-                gen_data = draw_sample(
-                    constraints,
-                    self.min_samples - len(training_data),
-                    self.data.columns,
-                    generate)
-
-                yield TLLNode(
-                    training_data = training_data,
-                    training_target_proba = parent.training_target_proba[training_mask],
-                    local_constraint = local_constraint,
-                    constraints = constraints,
-                    gen_data = gen_data,
-                    gen_target_proba = safe_ask_oracle(
-                        gen_data,
-                        self.oracle,
-                        parent.training_target_proba.columns),
-                    coverage = coverage,
-                    generate = generate)

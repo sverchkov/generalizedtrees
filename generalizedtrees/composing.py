@@ -94,6 +94,4 @@ def greedy_classification_tree_learner(
     if data_generator is not None:
         members.update(dict(new_generator=data_generator))
 
-    #C = type('C', (TreeBuilder, TreeClassifierMixin, node_building), members)
-
     return make_dataclass(name, fields=parameters, bases=bases, namespace=members)
