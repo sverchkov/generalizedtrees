@@ -84,3 +84,68 @@ def information_gain_p(split, data, target_proba):
         lambda b: entropy_of_p_matrix(target_proba[branches==b]),
         np.unique(branches)
     ))
+
+def auroc_criterion(split, data, target_proba):
+    """
+    Compute a criterion based on area under an ROC curve.
+
+    Adapted from the AUCsplit criterion (Ferri et al. ICML 2002) for target probability matrices.
+    PDF at: http://staff.icar.cnr.it/manco/Teaching/2006/datamining/articoli/105.pdf
+    """
+
+    n_s, n_t = target_proba.shape
+
+    thresholds = np.unique(target_proba[:, 1], return_index = True)
+    
+    if n_t != 2:
+        raise ValueError("The auroc criterion is only available for binary classification")
+
+    k = len(split.constraints)
+
+    branches = split.pick_branches(data)
+
+    best_auroc = 0
+
+    for t in thresholds:
+        positives = target_proba[:,1] >= t
+        negatives = np.logical_not(positives)
+        
+        branches_onehot = np.eye(k)[branches]
+        branch_pos = positives * branches_onehot
+        branch_neg = negatives * branches_onehot
+
+        branch_pos_count = np.sum(branch_pos, axis=0)
+        branch_neg_count = np.sum(branch_neg, axis=0)
+        branch_count = np.sum(branches_onehot)
+
+        # "Local predictive accuracy"
+        if branch_pos_count == branch_neg_count: # Catches 0-sample branches
+            branch_lpa = 0.5
+        else:
+            branch_lpa = branch_pos_count / (branch_pos_count + branch_neg_count)
+        
+        # Identify branches that have more negatives than positives, update lpa
+        neg_branches = branch_lpa < 0.5
+        if any(neg_branches):
+            branch_lpa[neg_branches] = 1 - branch_lpa[neg_branches]
+            branch_pos_count[neg_branches] = branch_neg_count[neg_branches]
+            branch_neg_count[neg_branches] = branch_count[neg_branches] - branch_pos_count[neg_branches]
+        
+        branch_order = np.argsort(branch_lpa)
+
+        auroc = 0
+        # Using notation from the paper:
+        x_t = sum(negatives)
+        y_t = sum(positives)
+        y_im1 = 0
+
+        for i in branch_order:
+            auroc += branch_neg_count[i] / x_t * (2 * y_im1 + branch_pos_count[i]) / (2 * y_t)
+            y_im1 += branch_pos_count[i]
+
+        if auroc > best_auroc:
+            best_auroc = auroc
+
+    return best_auroc
+
+
