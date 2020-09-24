@@ -35,7 +35,7 @@ setup(
     keywords="machine learning decision trees model",
     url="https://github.com/Craven-Biostat-Lab/generalizedtrees",
     packages=find_packages(exclude=['*.tests']),
-    package_data={'generalizedtrees': ['templates/*']},
+    package_data={'generalizedtrees.vis': ['*.html']},
     install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
