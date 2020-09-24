@@ -62,7 +62,7 @@ class SupervisedClassifierNode(ProbabilisticClassifierNodeMixin):
         self.src_data = data
         self.src_targets = targets
         self.target_classes = target_classes
-        self.branch = None
+        self.local_constraint = None
         self.idx = None
         self.split: Optional[SplitTest] = None
     
@@ -98,7 +98,7 @@ class SupCferNodeBuilderMixin:
         for b in np.unique(branches):
             node = SupervisedClassifierNode(self.data, self.targets, self.target_classes)
             node.idx = parent.idx[branches == b]
-            node.branch = parent.split.constraints[b]
+            node.local_constraint = parent.split.constraints[b]
 
             logger.debug(f'Created node with subview {node.idx}')
             yield node

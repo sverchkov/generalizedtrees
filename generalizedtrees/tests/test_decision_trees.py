@@ -96,3 +96,22 @@ def test_dtc_pandas(breast_cancer_data_pandas, caplog):
     dtc.predict(breast_cancer_data_pandas.x_test)
 
     logger.info("Done")
+
+def test_dtc_json(breast_cancer_data_pandas, caplog):
+    import logging
+    from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.vis import explanation_to_JSON
+
+    logger = logging.getLogger()
+    caplog.set_level(logging.DEBUG)
+
+    logger.info("Creating class instance")
+    dtc = DecisionTreeClassifier(max_depth = 5)
+
+    logger.info("Fitting tree")
+
+    dtc.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
+
+    logger.info(f'Learned tree:\n{dtc.show_tree()}')
+
+    logger.info(f'JSON: {explanation_to_JSON(dtc)}')

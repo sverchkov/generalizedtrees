@@ -16,7 +16,10 @@
 
 import pkgutil
 import json
+from logging import getLogger
 from generalizedtrees.queues import Stack
+
+logger = getLogger()
 
 TEMPLATE_STR = '/***DATA***/'
 DT_TEMPLATE = pkgutil.get_data('generalizedtrees.vis', 'decision_tree.html')
@@ -53,7 +56,7 @@ def explanation_to_JSON(explanation):
         
         # Record children
         if not in_node.is_leaf:
-            out_node['children'] = [{'branch': c.item.local_constraint} for c in out_node]
+            out_node['children'] = [{'branch': str(c.item.local_constraint)} for c in in_node]
             for pair in zip(out_node['children'], in_node):
                 stack.push(pair)
         
@@ -65,8 +68,22 @@ def explanation_to_JSON(explanation):
         if hasattr(in_node.item, 'model'):
             model = in_node.item.model
             # Monkey check for LR/linear model
+            # TODO: Handle case when intercept+coef are multi-d
             if hasattr(model, 'coef_') and hasattr(model, 'intercept_'):
-                out_node['logistic_model'] = {'intercept': model.intercept_}
-                out_node['logistic_model'].update(dict(model.coef_))
+                if hasattr(model.intercept_, 'shape'):
+                    intercept = model.intercept_.flat[0]
+                else:
+                    intercept = model.intercept_
+                out_node['logistic_model'] = {'intercept': intercept}
+                try:
+                    coefficients = {key: value
+                        for (key, value) in zip(explanation.feature_names, model.coef_.flat)
+                        if abs(value) > 0}
+                except:
+                    logger.critical(
+                        'Could not convert logistic model to JSON:'
+                        f'\ncoef_: {model.coef_}')
+                    raise
+                out_node['logistic_model'].update(coefficients)
     
     return json.dumps(root)

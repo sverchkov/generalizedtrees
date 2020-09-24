@@ -59,16 +59,7 @@ class Tree(Collection):
             """
             We use slices to access child nodes
             """
-            try:
-                return self.tree.node(self._children[key])
-            except:
-                logger.fatal(
-                    'Something went wrong in getting a child node:\n'
-                    f'key: {key}\n'
-                    f'index of calling node: {self._index}\n'
-                    f'indices of children: {self._children}\n'
-                    f'tree size: {len(self.tree._nodes)}\n')
-                raise
+            return self.tree.node(self._children[key])
 
     def __init__(self, contents = []):
         """

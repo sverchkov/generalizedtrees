@@ -41,6 +41,10 @@ def supervised_data_fit(tree_builder: AbstractTreeBuilder, data, targets, **kwar
     if not hasattr(tree_builder, 'feature_spec'):
         tree_builder.feature_spec = infer_feature_spec(data)
 
+    # Get explicit feature names
+    if not hasattr(tree_builder, 'feature_names'):
+        tree_builder.feature_names = tree_builder.data.columns
+
     tree_builder.data = data
     tree_builder.targets = targets
 
@@ -50,7 +54,7 @@ def supervised_data_fit(tree_builder: AbstractTreeBuilder, data, targets, **kwar
     return tree_builder
 
 def fit_with_data_and_oracle(
-    tree_builder,
+    tree_builder: AbstractTreeBuilder,
     data,
     oracle,
     #oracle_gives_probabilities: bool = False, #TODO: Figure out need and scope
@@ -79,6 +83,10 @@ def fit_with_data_and_oracle(
         tree_builder.target_classes = tree_builder.targets.columns
     else:
         tree_builder.targets = pd.Series(tree_builder.oracle(tree_builder.data))
+        tree_builder.target_classes = tree_builder.targets.unique()
+
+    if not hasattr(tree_builder, 'feature_names'):
+        tree_builder.feature_names = tree_builder.data.columns
 
     # Build the tree
     tree_builder.tree = tree_builder.build_tree()
