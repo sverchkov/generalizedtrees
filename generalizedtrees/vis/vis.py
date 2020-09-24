@@ -35,7 +35,7 @@ def explanation_to_html(explanation, out_file):
     if hasattr(out_file, 'write'):
         _insert_JSON(json_str, template, out_file)
     else:
-        with open(out_file) as f:
+        with open(out_file, 'wt') as f:
             _insert_JSON(json_str, template, f)
 
 def _insert_JSON(json_str, template, out_file):
