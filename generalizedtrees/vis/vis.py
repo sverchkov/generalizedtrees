@@ -22,22 +22,25 @@ from generalizedtrees.queues import Stack
 logger = getLogger()
 
 TEMPLATE_STR = '/***DATA***/'
-DT_TEMPLATE = pkgutil.get_data('generalizedtrees.vis', 'decision_tree.html')
+
+def _load_dt_template():
+    return pkgutil.get_data('generalizedtrees.vis', 'decision_tree.html')
 
 def explanation_to_html(explanation, out_file):
 
     json_str = explanation_to_JSON(explanation)
+    # We anticipate possibly using different templates depending on model type
+    template = _load_dt_template()
 
-    with open(DT_TEMPLATE) as in_file:
-        if hasattr(out_file, 'write'):
-            _insert_JSON(json_str, in_file, out_file)
-        else:
-            with open(out_file) as f:
-                _insert_JSON(json_str, in_file, f)
+    if hasattr(out_file, 'write'):
+        _insert_JSON(json_str, template, out_file)
+    else:
+        with open(out_file) as f:
+            _insert_JSON(json_str, template, f)
 
-def _insert_JSON(json_str, in_file, out_file):
+def _insert_JSON(json_str, template, out_file):
     
-    out_file.write(in_file.read().replace(TEMPLATE_STR, 'data = ' + json_str + ';'))
+    out_file.write(template.replace(TEMPLATE_STR, 'data = ' + json_str + ';'))
 
 def explanation_to_JSON(explanation):
 
