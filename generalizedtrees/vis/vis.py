@@ -24,7 +24,7 @@ logger = getLogger()
 TEMPLATE_STR = '/***DATA***/'
 
 def _load_dt_template():
-    return pkgutil.get_data('generalizedtrees.vis', 'decision_tree.html')
+    return pkgutil.get_data('generalizedtrees.vis', 'decision_tree.html').decode("utf-8")
 
 def explanation_to_html(explanation, out_file):
 
