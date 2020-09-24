@@ -52,7 +52,7 @@ def explanation_to_JSON(explanation):
             out_node['split'] = str(in_node.item.split)
         
         # Record children
-        if not in_node.is_leaf():
+        if not in_node.is_leaf:
             out_node['children'] = [{'branch': c.item.local_constraint} for c in out_node]
             for pair in zip(out_node['children'], in_node):
                 stack.push(pair)
