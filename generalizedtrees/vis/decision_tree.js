@@ -6,14 +6,19 @@ const node_height = 100;
 // Functions
 
 // Compute the tree layout
-tree = data => {
+function tree(data) {
     const root = d3.hierarchy(data);
 
     return d3.tree().size([width - node_width, root.height * 2 * node_height])(root);
 }
 
-// Draw the tree
+// Backwards compatibility werapper
 function draw_it(){
+    d3.select("#drawing").append(() => draw_tree(data))
+}
+
+// Draw the tree
+function draw_tree(data){
     
     const root = tree(data)
 
@@ -29,7 +34,7 @@ function draw_it(){
         if (d.x < x0) x0 = d.x;
     });
 
-    const svg = d3.select("#drawing").append("svg")
+    const svg = d3.create("svg:svg")
         .attr("viewBox", [-node_width/2, -node_height/2, width, y1 - y0 + node_height]);
     
     const g = svg.append("g")
@@ -70,6 +75,8 @@ function draw_it(){
         .attr("transform", d => `translate(${d.x},${d.y})`);
     
     fillNodes(node);
+
+    return svg.node();
 }
 
 // Function that dispatches different node filling calls
