@@ -21,26 +21,33 @@ from generalizedtrees.queues import Stack
 
 logger = getLogger()
 
-TEMPLATE_STR = '/***DATA***/'
+DATA_TEMPLATE_STR = '/***DATA***/'
+ARTIST_TEMPLATE_STR = '/**DRAWING SCRIPT**/'
 
-def _load_dt_template():
-    return pkgutil.get_data('generalizedtrees.vis', 'decision_tree.html').decode("utf-8")
+def _load_html_template():
+    return pkgutil.get_data('generalizedtrees.vis', 'template.html').decode('utf-8')
+
+def _load_dt_js():
+    return pkgutil.get_data('generalizedtrees.vis', 'decision_tree.js').decode('utf-8')
 
 def explanation_to_html(explanation, out_file):
 
     json_str = explanation_to_JSON(explanation)
     # We anticipate possibly using different templates depending on model type
-    template = _load_dt_template()
+    html_template = _load_html_template()
+    dt_artist = _load_dt_js()
 
     if hasattr(out_file, 'write'):
-        _insert_JSON(json_str, template, out_file)
+        _frankenstein(json_str, dt_artist, html_template, out_file)
     else:
         with open(out_file, 'wt') as f:
-            _insert_JSON(json_str, template, f)
+            _frankenstein(json_str, dt_artist, html_template, f)
 
-def _insert_JSON(json_str, template, out_file):
+def _frankenstein(data_str, artist_str, template_str, out_file):
     
-    out_file.write(template.replace(TEMPLATE_STR, 'data = ' + json_str + ';'))
+    out_file.write(template_str
+        .replace(DATA_TEMPLATE_STR, 'data = ' + data_str + ';')
+        .replace(ARTIST_TEMPLATE_STR, artist_str))
 
 def explanation_to_JSON(explanation):
 
