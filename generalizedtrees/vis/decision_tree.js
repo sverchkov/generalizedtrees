@@ -113,94 +113,40 @@ function fillPNodes(nodeSelection){
 
 // Draws logistic leaf nodes
 function fillLRNodes(nodeSelection){
-    const r_height = 3;
+    const r_height = 9;
 
-    nodeSelection.append("g")
-        .selectAll("rectangle")
-        .data(d => d.data.logistic_model)
-        .join("rectangle")
-        .attr("fill", v => v < 0 ? "#900" : "#090")
-        .attr("y", function(v,i){return i * r_height;})
-        .attr("x", 0)
-        .attr("width", v => v)
-        .attr("height", r_height);
-    
-    nodeSelection.append("g")
-        .selectAll("text")
-        .data(function(d, i){
+    let min_v = 0;
+    let max_v = 0;
 
-            return d.data.logistic_model;
+    nodeSelection.data().forEach(function(d){
+        d.data.logistic_model.forEach(function(v){
+            if (v.value < min_v) min_v = v.value;
+            if (v.value > max_v) max_v = v.value;
         })
-        .join("text")
-        .attr("dy", "0.31em")
-        .attr("y", 6)
-        .attr("text-anchor", "middle")
-        .text(d => JSON.stringify(d))
-}
+    })
 
-function buildNode(datum){
-    construction = d3.create("svg:circle")
-        .datum(datum)
-        .attr("r", 4)
-        .attr("fill", d => d.children ? "#900" : "#090");
+    const bars_xscale = node_width / (max_v - min_v);
+    const bars_xshift = 0 - (max_v + min_v) / 2;
     
-    return construction.node();
-}
-
-// Node drawing:
-function drawNode(node_data, i){
-
-    const node = d3.select(this);
-
-    node.append("circle")
-        .attr("fill", d => d.children ? "#555" : "#999")
-        .attr("r", 2.5);
-
-    if(node_data.data.split){
-
-        node.append("text")
-            .attr("dy", "0.31em")
-            .attr("y", -6)
-            .attr("text-anchor", "middle")
-            .text(d => d.data.split)
-            .clone(true).lower()
-            .attr("stroke", "white");
-    }else if(node_data.data.branch){
-        node.append("text")
-            .attr("dy", "0.31em")
-            .attr("y", -6)
-            .attr("text-anchor", "middle")
-            .text(d => d.data.branch)
-            .clone(true).lower()
-            .attr("stroke", "white");
-    }
-
-    if(node_data.data.probabilities){
-        node.append("text")
-            .attr("dy", "0.31em")
-            .attr("y", 6)
-            .attr("text-anchor", "middle")
-            .text(d => JSON.stringify(d.data.probabilities))
-            .clone(true).lower()
-            .attr("stroke", "white");
-    }
-
-    if(node_data.data.logistic_model){
-
-        const content = d3.create("svg:g");
-
-        content.selectAll("g")
-            .data(node_data)
-            .enter()
-            .append("text")
-            .attr("dy", "0.31em")
-            .attr("y", 6)
-            .attr("text-anchor", "middle")
-            .text(d => JSON.stringify(d.data.logistic_model))
-            .clone(true).lower()
-            .attr("stroke", "white");
-
-        node.append(() => content.node());
-    }
-
+    bars = nodeSelection.selectAll("g")
+        .data(d => d.data.logistic_model)
+        .join("g")
+        .attr("transform", function(d,i){
+            return `translate(${bars_xshift},${i * r_height})`;
+        });
+    
+    bars.append("rect")
+        .attr("fill", d => d.value < 0 ? "#900" : "#090")
+        .attr("y", -r_height/2)
+        .attr("height", r_height)
+        .attr("x", d => d.value < 0 ? d.value * bars_xscale : 0)
+        .attr("width", d => Math.abs(d.value) * bars_xscale)
+    
+    bars.append("text")
+        .attr("dy", "0.31em")
+        .attr("dx", d => d.value < 0 ? "0.31em" : "-0.31em")
+        .attr("text-anchor", d => d.value < 0 ? "start" : "end")
+        .text(d => d.label)
+        .clone(true).lower()
+        .attr("stroke", "white");
 }
