@@ -18,6 +18,7 @@ import pkgutil
 import json
 from logging import getLogger
 from generalizedtrees.queues import Stack
+import generalizedtrees.constraints as cons
 
 logger = getLogger()
 
@@ -49,6 +50,20 @@ def _frankenstein(data_str, artist_str, template_str, out_file):
         .replace(DATA_TEMPLATE_STR, 'data = ' + data_str + ';')
         .replace(ARTIST_TEMPLATE_STR, artist_str))
 
+
+def _get_constraint_type_as_html_string(constraint):
+    if isinstance(constraint, cons.GTConstraint):
+        return f'> {constraint.value}'
+    if isinstance(constraint, cons.LEQConstraint):
+        return f'\u2264 {constraint.value}'
+    if isinstance(constraint, cons.EQConstraint):
+        return f'= {constraint.value}'
+    if isinstance(constraint, cons.NEQConstraint):
+        return f'\u2260 {constraint.value}'
+    # Fall through catch-all
+    return str(constraint)
+
+
 def explanation_to_JSON(explanation):
 
     root = dict()
@@ -66,14 +81,19 @@ def explanation_to_JSON(explanation):
         
         # Record children
         if not in_node.is_leaf:
-            out_node['children'] = [{'branch': str(c.item.local_constraint)} for c in in_node]
+            out_node['children'] = [
+                {'branch': _get_constraint_type_as_html_string(c.item.local_constraint)}
+                for c in in_node]
             for pair in zip(out_node['children'], in_node):
                 stack.push(pair)
         
         # Node-model specific conversions
         # should it be the node class' responsibility to implement these?
         if hasattr(in_node.item, 'probabilities'):
-            out_node['probabilities'] = dict(in_node.item.probabilities)
+            out_node['probabilities'] = [{'value': x} for x in in_node.item.probabilities]
+            if hasattr(in_node.item.probabilities, 'index'):
+                for d, i in zip(out_node['probabilities'], in_node.item.probabilities.index):
+                    d['target'] = i
         
         if hasattr(in_node.item, 'model'):
             model = in_node.item.model
@@ -84,16 +104,16 @@ def explanation_to_JSON(explanation):
                     intercept = model.intercept_.flat[0]
                 else:
                     intercept = model.intercept_
-                out_node['logistic_model'] = {'intercept': intercept}
+                out_node['logistic_model'] = [{'label': 'intercept', 'value': intercept}]
                 try:
-                    coefficients = {key: value
+                    coefficients = [{'label': key, 'value': value}
                         for (key, value) in zip(explanation.feature_names, model.coef_.flat)
-                        if abs(value) > 0}
+                        if abs(value) > 0]
                 except:
                     logger.critical(
                         'Could not convert logistic model to JSON:'
                         f'\ncoef_: {model.coef_}')
                     raise
-                out_node['logistic_model'].update(coefficients)
+                out_node['logistic_model'].extend(coefficients)
     
     return json.dumps(root)
