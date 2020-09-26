@@ -142,6 +142,7 @@ function fillLRNodes(nodeSelection){
             return `translate(${bars_xshift},${i * r_height})`;
         });
     
+    // Drawn bars
     bars.append("rect")
         .attr("fill", d => d.value < 0 ? "#900" : "#090")
         .attr("y", -r_height/2)
@@ -149,6 +150,7 @@ function fillLRNodes(nodeSelection){
         .attr("x", d => d.value < 0 ? d.value * bars_xscale : 0)
         .attr("width", d => Math.abs(d.value) * bars_xscale)
     
+    // Feature names (text)
     bars.append("text")
         .attr("dy", "0.31em")
         .attr("dx", d => d.value < 0 ? "0.31em" : "-0.31em")
@@ -156,4 +158,13 @@ function fillLRNodes(nodeSelection){
         .text(d => d.label)
         .clone(true).lower()
         .attr("stroke", "white");
+
+    // Coefficient values (text)
+    bars.append("text")
+        .attr("dy", "0.31em")
+        .attr("dx", d => d.value < 0 ? "-0.31em" : "0.31em")
+        .attr("text-anchor", d => d.value < 0 ? "end" : "start")
+        .attr("x", d => d.value * bars_xscale)
+        .attr("fill", d => d.value < 0 ? "#900" : "#090")
+        .text(d => d.value.toExponential(3));
 }
