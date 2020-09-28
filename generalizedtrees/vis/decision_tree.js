@@ -37,6 +37,12 @@ function draw_tree(data){
     const svg = d3.create("svg:svg")
         .attr("viewBox", [-node_width/2, -node_height/2, width, y1 - y0 + node_height]);
     
+    // Create a legend in the top left
+    const legend = svg.append("g")
+        .attr("font-family", "sans-serif")
+        .attr("font-size", 10);
+    
+    // Containing group for the tree
     const g = svg.append("g")
         .attr("font-family", "sans-serif")
         .attr("font-size", 10)
@@ -74,17 +80,17 @@ function draw_tree(data){
         .join("g")
         .attr("transform", d => `translate(${d.x},${d.y})`);
     
-    fillNodes(node);
+    fillNodes(node, legend);
 
     return svg.node();
 }
 
 // Function that dispatches different node filling calls
-function fillNodes(nodeSelection){
+function fillNodes(nodeSelection, legend){
 
     fillSplitNodes(nodeSelection.filter(d => !!d.children))
     
-    fillPNodes(nodeSelection.filter(d => !d.children && d.data.probabilities))
+    fillPNodes(nodeSelection.filter(d => !d.children && d.data.probabilities), legend)
 
     fillLRNodes(nodeSelection.filter(d => !d.children && d.data.logistic_model))
 }
@@ -104,18 +110,61 @@ function fillSplitNodes(nodeSelection){
 }
 
 // Draws probability leaf nodes
-function fillPNodes(nodeSelection){
-    // TODO: pie chart
-    nodeSelection.append("circle")
-        .attr("fill", "#999")
-        .attr("r", 2.5)
-    nodeSelection.append("text")
-        .attr("dy", "0.31em")
-        .attr("y", 6)
-        .attr("text-anchor", "middle")
-        .text(d => JSON.stringify(d.data.probabilities))
-        .clone(true).lower()
-        .attr("stroke", "white");
+function fillPNodes(nodeSelection, legend){
+
+    // Create scale on which targets are listed
+    const targets = new Set();
+    nodeSelection.data().forEach(d =>
+        d.data.probabilities.forEach(v => targets.add(v.target)))
+    const color = d3.scaleOrdinal().domain(targets).range(d3.schemeCategory10)
+
+    // Helpers
+    const pie = d3.pie().sort(null).value(d => d.value)
+    const arc = d3.arc().innerRadius(0).outerRadius(Math.min(node_height, node_width)/4)
+
+    // Draw pie charts
+    slices = nodeSelection.selectAll("path")
+        .data(d => pie(d.data.probabilities))
+        .join("path")
+        .attr("fill", d => color(d.data.target))
+        .attr("stroke-width", "0.5")
+        .attr("stroke", "white")
+        .attr("d", arc)
+
+    // Add pie slices to legend:
+    // Some constants
+    const legend_item_size = 12
+    const legend_pieslice = d3.arc()
+        .startAngle(0)
+        .endAngle(Math.PI * 0.3)
+        .innerRadius(0)
+        .outerRadius(0.8 * legend_item_size)();
+    // Get current legend height
+    const legend_y = legend.node().getBBox().height;
+    // Create legend section
+    const legend_section = legend.append("g")
+        .attr("transform", `translate(${0},${legend_y})`);
+    legend_section.append("text")
+        .attr("font-weight", "bold")
+        .attr("text-anchor", "start")
+        .text("Target");
+    // Create legend items
+    const legend_item = legend_section
+        .selectAll("g")
+        .data(targets)
+        .join("g")
+        .attr("transform", (d, i) =>
+            `translate(${legend_item_size/3}, ${(i + 1.5) * legend_item_size})`);
+    legend_item.append("path")
+        .attr("fill", color)
+        .attr("stroke-width", "0.5")
+        .attr("stroke", "white")
+        .attr("d", legend_pieslice);
+    legend_item.append("text")
+        .attr("dy", "-0.20em")
+        .attr("dx", legend_item_size)
+        .attr("text-anchor", "start")
+        .text(d => d);
 }
 
 // Draws logistic leaf nodes
