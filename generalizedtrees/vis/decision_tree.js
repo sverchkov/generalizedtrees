@@ -5,6 +5,54 @@ const node_height = 100;
 
 // Functions
 
+// Tooltip event handlers
+function t_mouseover(tooltip){
+    return function (e, d) {
+
+        let show = false;
+
+        // Clear prior contents
+        tooltip.selectAll("*").remove();
+        
+        // Fill contents depending on node type
+        if (d.children){
+            // TODO: fetch split feature annotation
+        } else {
+            // TODO: contents for logistic leaves
+
+            // Probability leaves:
+            if (d.data.probabilities){
+                show = true;
+                const table = tooltip.append("table");
+                //const header = table.append("thead").append("tr");
+                //header.append("td");
+                //header.append("td").text("probability");
+                const rows = table.append("tbody")
+                    .selectAll("tr")
+                    .data(d.data.probabilities)
+                    .join("tr");
+                rows.append("td").style("font-weight", "bold").text(d => d.target + ":");
+                rows.append("td").text(d => d.value);
+            }
+        }
+
+        if (show) {
+            tooltip.style("visibility", "visible");
+        }
+        return tooltip;
+    }
+}
+
+function t_mouseout(tooltip){
+    return () => tooltip.style("visibility", "hidden");
+}
+
+function t_mousemove(tooltip){
+    return (e) => tooltip
+        .style("left", (e.pageX + 20) + "px")
+        .style("top", (e.pageY + 20) + "px");
+}
+
 // Compute the tree layout
 function tree(data) {
     const root = d3.hierarchy(data);
@@ -79,9 +127,27 @@ function draw_tree(data){
         .data(root.descendants())
         .join("g")
         .attr("transform", d => `translate(${d.x},${d.y})`);
-    
+
     fillNodes(node, legend);
 
+    // Tooltip
+    const tooltip = d3.select('body').append('div')
+        .attr("id", "tooltip")
+        .style("position", "absolute")
+        .style("visibility", "hidden")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "1px")
+        .style("border-radius", "5px")
+        .style("font-family", "sans-serif")
+        .style("font-size", "10pt")
+        .style("padding", "5px");
+
+    // Tooltip events
+    node.on('mouseover', t_mouseover(tooltip))
+        .on('mouseout', t_mouseout(tooltip))
+        .on('mousemove', t_mousemove(tooltip));
+    
     return svg.node();
 }
 
