@@ -16,7 +16,15 @@ function t_mouseover(tooltip){
         
         // Fill contents depending on node type
         if (d.children){
-            // TODO: fetch split feature annotation
+            // fetch split feature annotation
+            if (d.data.feature_annotation){
+                show = true;
+                const lines = tooltip.selectAll("p")
+                    .data(d.data.feature_annotation)
+                    .join(p);
+                lines.append("div").style("font-weight", "bold").text(d => d.annotation + ":");
+                lines.append("div").text(d => d.value);
+            }
         } else {
             // TODO: contents for logistic leaves
 

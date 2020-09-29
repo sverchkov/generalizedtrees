@@ -31,9 +31,9 @@ def _load_html_template():
 def _load_dt_js():
     return pkgutil.get_data('generalizedtrees.vis', 'decision_tree.js').decode('utf-8')
 
-def explanation_to_html(explanation, out_file):
+def explanation_to_html(explanation, out_file, feature_annotations = None):
 
-    json_str = explanation_to_JSON(explanation)
+    json_str = explanation_to_JSON(explanation, feature_annotations)
     # We anticipate possibly using different templates depending on model type
     html_template = _load_html_template()
     dt_artist = _load_dt_js()
@@ -64,7 +64,7 @@ def _get_constraint_type_as_html_string(constraint):
     return str(constraint)
 
 
-def explanation_to_JSON(explanation):
+def explanation_to_JSON(explanation, feature_annotations = None):
 
     root = dict()
 
@@ -78,6 +78,19 @@ def explanation_to_JSON(explanation):
         # Record split
         if hasattr(in_node.item, 'split') and in_node.item.split is not None:
             out_node['split'] = str(in_node.item.split)
+
+            if feature_annotations is not None:
+                try:
+                    f = in_node.item.split.feature
+                    annotation = feature_annotations.loc[f]
+                    out_node['feature_annotation'] = [{'annotation': 'feature_id', 'value': f}]
+                    out_node['feature_annotation'].extend([
+                        {'annotation': i, 'value': v} for i, v in annotation.iteritems()])
+                
+                except Exception as e:
+                    logger.warning(
+                        f"Could not bind feature annotation to {in_node.item.split}",
+                        exc_info=e)
         
         # Record children
         if not in_node.is_leaf:
