@@ -19,11 +19,11 @@ function t_mouseover(tooltip){
             // fetch split feature annotation
             if (d.data.feature_annotation){
                 show = true;
-                const lines = tooltip.selectAll("p")
+                const lines = tooltip.selectAll("div")
                     .data(d.data.feature_annotation)
-                    .join(p);
-                lines.append("div").style("font-weight", "bold").text(d => d.annotation + ":");
-                lines.append("div").text(d => d.value);
+                    .join("div");
+                lines.append("span").style("font-weight", "bold").text(d => d.annotation + ": ");
+                lines.append("span").text(d => d.value);
             }
         } else {
             // TODO: contents for logistic leaves

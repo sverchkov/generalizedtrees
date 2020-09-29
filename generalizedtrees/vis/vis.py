@@ -53,13 +53,13 @@ def _frankenstein(data_str, artist_str, template_str, out_file):
 
 def _get_constraint_type_as_html_string(constraint):
     if isinstance(constraint, cons.GTConstraint):
-        return f'> {constraint.value}'
+        return f'> {constraint.value:.4g}'
     if isinstance(constraint, cons.LEQConstraint):
-        return f'\u2264 {constraint.value}'
+        return f'\u2264 {constraint.value:.4g}'
     if isinstance(constraint, cons.EQConstraint):
-        return f'= {constraint.value}'
+        return f'= {constraint.value:.4g}'
     if isinstance(constraint, cons.NEQConstraint):
-        return f'\u2260 {constraint.value}'
+        return f'\u2260 {constraint.value:.4g}'
     # Fall through catch-all
     return str(constraint)
 
@@ -83,7 +83,7 @@ def explanation_to_JSON(explanation, feature_annotations = None):
                 try:
                     f = in_node.item.split.feature
                     annotation = feature_annotations.loc[f]
-                    out_node['feature_annotation'] = [{'annotation': 'feature_id', 'value': f}]
+                    out_node['feature_annotation'] = [{'annotation': 'feature id', 'value': f}]
                     out_node['feature_annotation'].extend([
                         {'annotation': i, 'value': v} for i, v in annotation.iteritems()])
                 
