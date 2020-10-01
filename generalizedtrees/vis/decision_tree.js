@@ -15,26 +15,25 @@ function t_mouseover(tooltip){
         tooltip.selectAll("*").remove();
 
         // Ugly sample listing
-        const samples_table = tolltip.append("table");
-        const samples_header = samples_table.append("thead").append("tr");
+        const samples_table = tooltip.append("table");
+        const samples_header = samples_table.append("thead")
+            .style("font-weight", "bold")
+            .append("tr");
         samples_header.append("td").text("counts");
-        samples_header.selectAll("td")
+        samples_header.selectAll("td.counts")
             .data(d.data.training_samples)
-            .enter()
-            .append("td").text(d => d.label);
+            .join("td").attr("class", "counts").text(d => d.label);
         const samples_tbody = samples_table.append("tbody");
         const training_row = samples_tbody.append("tr");
-        training_row.append("td").text("training");
-        training_row.selectAll("td")
+        training_row.append("td").style("font-weight", "bold").text("training");
+        training_row.selectAll("td.counts")
             .data(d.data.training_samples)
-            .enter()
-            .append("td").text(d => d.count);
+            .join("td").attr("class", "counts").text(d => d.count);
         const gen_row = samples_tbody.append("tr");
-        gen_row.append("td").text("generated");
-        gen_row.selectAll("td")
+        gen_row.append("td").style("font-weight", "bold").text("generated");
+        gen_row.selectAll("td.counts")
             .data(d.data.generated_samples)
-            .enter()
-            .append("td").text(d => d.count)
+            .join("td").attr("class", "counts").text(d => d.count)
     
         
         // Fill contents depending on node type
