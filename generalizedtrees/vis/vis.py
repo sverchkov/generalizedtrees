@@ -75,6 +75,20 @@ def explanation_to_JSON(explanation, feature_annotations = None):
 
         out_node, in_node = stack.pop()
 
+        # Record training set counts (and target distributions)
+        if hasattr(in_node.item, 'training_target_proba'):
+            if 'samples' not in out_node:
+                out_node['samples'] = dict()
+            out_node['samples'].update({f'training_labeled_{k}': v for k, v in
+                in_node.item.training_target_proba.sum(axis=0).iteritems()})
+
+        # Record training set counts (and target distributions)
+        if hasattr(in_node.item, 'gen_target_proba'):
+            if 'samples' not in out_node:
+                out_node['samples'] = dict()
+            out_node['samples'].update({f'generated_labeled_{k}': v for k, v in
+                in_node.item.gen_target_proba.sum(axis=0).iteritems()})
+
         # Record split
         if hasattr(in_node.item, 'split') and in_node.item.split is not None:
             out_node['split'] = str(in_node.item.split)
