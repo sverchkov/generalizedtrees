@@ -77,17 +77,14 @@ def explanation_to_JSON(explanation, feature_annotations = None):
 
         # Record training set counts (and target distributions)
         if hasattr(in_node.item, 'training_target_proba'):
-            if 'samples' not in out_node:
-                out_node['samples'] = dict()
-            out_node['samples'].update({f'training_labeled_{k}': v for k, v in
-                in_node.item.training_target_proba.sum(axis=0).iteritems()})
+            out_node['training_samples'] = [
+                {'label':k, 'count': v} for k, v in
+                in_node.item.training_target_proba.sum(axis=0).iteritems()]
 
-        # Record training set counts (and target distributions)
         if hasattr(in_node.item, 'gen_target_proba'):
-            if 'samples' not in out_node:
-                out_node['samples'] = dict()
-            out_node['samples'].update({f'generated_labeled_{k}': v for k, v in
-                in_node.item.gen_target_proba.sum(axis=0).iteritems()})
+            out_node['generated_samples'] = [
+                {'label': k, 'count': v} for k, v in
+                in_node.item.gen_target_proba.sum(axis=0).iteritems()]
 
         # Record split
         if hasattr(in_node.item, 'split') and in_node.item.split is not None:
@@ -120,7 +117,8 @@ def explanation_to_JSON(explanation, feature_annotations = None):
             out_node['probabilities'] = [{'value': x} for x in in_node.item.probabilities]
             if hasattr(in_node.item.probabilities, 'index'):
                 for d, i in zip(out_node['probabilities'], in_node.item.probabilities.index):
-                    d['target'] = i
+                    d['target'] = i #TODO: Remove
+                    d['label'] = i
         
         if hasattr(in_node.item, 'model'):
             model = in_node.item.model

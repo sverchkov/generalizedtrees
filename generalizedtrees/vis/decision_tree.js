@@ -13,6 +13,29 @@ function t_mouseover(tooltip){
 
         // Clear prior contents
         tooltip.selectAll("*").remove();
+
+        // Ugly sample listing
+        const samples_table = tolltip.append("table");
+        const samples_header = samples_table.append("thead").append("tr");
+        samples_header.append("td").text("counts");
+        samples_header.selectAll("td")
+            .data(d.data.training_samples)
+            .enter()
+            .append("td").text(d => d.label);
+        const samples_tbody = samples_table.append("tbody");
+        const training_row = samples_tbody.append("tr");
+        training_row.append("td").text("training");
+        training_row.selectAll("td")
+            .data(d.data.training_samples)
+            .enter()
+            .append("td").text(d => d.count);
+        const gen_row = samples_tbody.append("tr");
+        gen_row.append("td").text("generated");
+        gen_row.selectAll("td")
+            .data(d.data.generated_samples)
+            .enter()
+            .append("td").text(d => d.count)
+    
         
         // Fill contents depending on node type
         if (d.children){
