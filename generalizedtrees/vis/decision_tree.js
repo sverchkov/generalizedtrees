@@ -9,38 +9,37 @@ const node_height = 100;
 function t_mouseover(tooltip){
     return function (e, d) {
 
-        let show = false;
-
         // Clear prior contents
         tooltip.selectAll("*").remove();
 
         // Ugly sample listing
-        const samples_table = tooltip.append("table");
-        const samples_header = samples_table.append("thead")
-            .style("font-weight", "bold")
-            .append("tr");
-        samples_header.append("td").text("counts");
-        samples_header.selectAll("td.counts")
-            .data(d.data.training_samples)
-            .join("td").attr("class", "counts").text(d => d.label);
-        const samples_tbody = samples_table.append("tbody");
-        const training_row = samples_tbody.append("tr");
-        training_row.append("td").style("font-weight", "bold").text("training");
-        training_row.selectAll("td.counts")
-            .data(d.data.training_samples)
-            .join("td").attr("class", "counts").text(d => d.count);
-        const gen_row = samples_tbody.append("tr");
-        gen_row.append("td").style("font-weight", "bold").text("generated");
-        gen_row.selectAll("td.counts")
-            .data(d.data.generated_samples)
-            .join("td").attr("class", "counts").text(d => d.count)
+        if (d.data.training_samples) {
+            const samples_table = tooltip.append("table");
+            const samples_header = samples_table.append("thead")
+                .style("font-weight", "bold")
+                .append("tr");
+            samples_header.append("td").text("counts");
+            samples_header.selectAll("td.counts")
+                .data(d.data.training_samples)
+                .join("td").attr("class", "counts").text(d => d.label);
+            const samples_tbody = samples_table.append("tbody");
+            const training_row = samples_tbody.append("tr");
+            training_row.append("td").style("font-weight", "bold").text("training");
+            training_row.selectAll("td.counts")
+                .data(d.data.training_samples)
+                .join("td").attr("class", "counts").text(d => d.count);
+            const gen_row = samples_tbody.append("tr");
+            gen_row.append("td").style("font-weight", "bold").text("generated");
+            gen_row.selectAll("td.counts")
+                .data(d.data.generated_samples)
+                .join("td").attr("class", "counts").text(d => d.count)
+        }
     
         
         // Fill contents depending on node type
         if (d.children){
             // fetch split feature annotation
             if (d.data.feature_annotation){
-                show = true;
                 const lines = tooltip.selectAll("div")
                     .data(d.data.feature_annotation)
                     .join("div");
@@ -52,7 +51,6 @@ function t_mouseover(tooltip){
 
             // Probability leaves:
             if (d.data.probabilities){
-                show = true;
                 const table = tooltip.append("table");
                 //const header = table.append("thead").append("tr");
                 //header.append("td");
@@ -66,9 +64,8 @@ function t_mouseover(tooltip){
             }
         }
 
-        if (show) {
-            tooltip.style("visibility", "visible");
-        }
+        tooltip.style("visibility", "visible");
+        
         return tooltip;
     }
 }
