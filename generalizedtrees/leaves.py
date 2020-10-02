@@ -1,6 +1,6 @@
 # Leaf models for trees
 #
-# Copyright 2019 Yuriy Sverchkov
+# Copyright 2019-2020 Yuriy Sverchkov
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,17 +14,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from numpy import ndarray, full
+import numpy as np
+from typing import Protocol
 
 
-class SimplePredictor:
+class LocalEstimator(Protocol):
 
-    def __init__(self, prediction):
-        self.prediction = prediction
+    def fit(self, x, y, **kwargs) -> 'LocalEstimator':
+        return self
 
-    def predict(self, data: ndarray):
-        assert data.ndim == 2
-        return full(data.shape[0], self.prediction)
+    def estimate(self, data_matrix: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
 
-    def __repr__(self):
-        return f'Predict: {self.prediction}'
+
+class ConstantEstimator(LocalEstimator):
+
+    def __init__(self):
+        self.est_vector: np.ndarray
+    
+    def fit(self, x=None, y=None, **kwargs):
+
+        if y is None:
+            assert x is not None
+            target_matrix = x
+        else:
+            target_matrix = y
+        
+        self.est_vector = target_matrix.mean(axis=0)
+
+        return self
+
+    def estimate(self, data_matrix: np.ndarray) -> np.ndarray:
+
+        assert data_matrix.ndim == 2
+        
+        return np.repeat(np.reshape(self.est_vector, (1,-1)), data_matrix.shape[0], axis=0)
+
+
+class SKProbaEstimator(LocalEstimator):
+    """
+    Wrapper around an sklearn classifier, uses the predict_proba method.
+    """
+
+    def __init__(self, classifier):
+        self.classifier = classifier
+    
+    def fit(self, x, y, **kwargs):
+        self.classifier.fit(x, y, **kwargs)
+        return self
+
+    def estimate(self, data_matrix: np.ndarray) -> np.ndarray:
+        return self.classifier.predict_proba(data_matrix)

@@ -17,7 +17,7 @@
 from typing import Type, Any, Callable
 from dataclasses import make_dataclass
 from generalizedtrees.base import GreedyTreeBuilder, CanPushPop
-from generalizedtrees.classification import TreeClassifierMixin
+from generalizedtrees.predict import TreeClassifierMixin
 from generalizedtrees.tree import tree_to_str
 from logging import getLogger
 

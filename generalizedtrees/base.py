@@ -73,12 +73,14 @@ class GreedyTreeBuilder(AbstractTreeBuilder):
         while queue and not self.global_stop(tree):
 
             node, ptr = queue.pop()
-            node.split = self.construct_split(node)
 
-            if node.split is not None:
-                for child in self.generate_children(node):
-                    child_ptr = tree.add_node(child, parent_key=ptr)
-                    if not self.local_stop(tree.node(child_ptr)):
+            if not self.local_stop(tree.node(ptr)):
+
+                node.split = self.construct_split(node)
+
+                if node.split is not None:
+                    for child in self.generate_children(node):
+                        child_ptr = tree.add_node(child, parent_key=ptr)
                         queue.push((child, child_ptr))
         
         return tree
