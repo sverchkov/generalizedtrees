@@ -69,6 +69,33 @@ def compose_sample_based_split_constructor(
     
     return construct_split
 
+def compose_split_constructor_mk2(split_candidate_generator, split_score, *ignoreArgs):
+    """
+    Create a split constructor that finds an optimal split for a node. Mk2.
+
+    :param split_candidate_generator: Function to generate split candidates, should have
+    a signature of {feature_spec, data, y -> iterable(split)}
+    :param split_score: Split scoring function, should have a signature of {node, split -> float}
+    """
+    def construct_split(tree_model, node):
+        data = node.data
+        y = node.target_proba # Old approach, need to change to some variant of 'estimate'
+        feature_spec = tree_model.feature_spec
+
+        split_candidates = split_candidate_generator(feature_spec, data, y)
+        best_split = None
+        best_split_score = 0
+        for split in split_candidates:
+            new_score = split_score(node, split)
+            if new_score > best_split_score:
+                best_split_score = new_score
+                best_split = split
+        
+        logger.debug(f'Best split "{best_split}" with score {best_split_score}')
+
+        return best_split
+    
+    return construct_split
 
 # Composing a classification tree learner
 
@@ -88,11 +115,12 @@ def greedy_classification_tree_learner(
     bases = (node_building, TreeClassifierMixin, GreedyTreeBuilder)
 
     use_proba = kwargs.get('use_proba', False)
+    splits_composer = kwargs.get('splits_composer', compose_sample_based_split_constructor)
 
     members = dict(
         fit=fitter,
         new_queue=queue,
-        construct_split=compose_sample_based_split_constructor(
+        construct_split=splits_composer(
             split_candidate_generator,
             split_score,
             use_proba),

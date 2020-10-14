@@ -85,6 +85,29 @@ def information_gain_p(split, data, target_proba):
         np.unique(branches)
     ))
 
+
+def ijcai19_lr_gradient_slow(node, split):
+    """
+    Gradient-based split score for logistic regression model trees.
+
+    A slow implementation of the criterion described in Broelemann and Kasneci 2019 (IJCAI)
+    Assumes that the model at the node is an sk-learn binary logistic regression.
+    """
+
+    branches = split.pick_branches(node.data)
+
+    x = np.concatenate([np.ones((node.data.shape[0], 1)), node.data], axis=1)
+
+    # LR loss (unregularized) gradient is easy to compute from data, targets, and prediction:
+    y = node.target_proba[:,[1]]
+    y_hat = node.model.estimate(node.data)[:,[1]]
+    gradients = (y_hat - y) * y_hat * (1 - y_hat) * x
+
+    # This is eq. 6 in the paper
+    ssg = (gradients**2).sum(axis=1)
+    return sum(map(lambda b: ssg[branches == b].mean(), np.unique(branches)))
+
+
 def auroc_criterion(split, data, target_proba):
     """
     Compute a criterion based on area under an ROC curve.
