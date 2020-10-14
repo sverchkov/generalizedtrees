@@ -45,6 +45,6 @@ def entropy_of_p_matrix(pm):
 
 def entropy_of_p_vector(p):
     
-    pl2p = np.where(p > 0, -p*np.log2(p, where = p > 0), 0)
+    pl2p = np.where(p > 0, - p * np.log2(p, where = p > 0), 0)
 
     return sum(pl2p)

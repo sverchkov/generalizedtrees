@@ -79,12 +79,12 @@ def explanation_to_JSON(explanation, feature_annotations = None):
         if hasattr(in_node.item, 'training_target_proba'):
             out_node['training_samples'] = [
                 {'label':k, 'count': v} for k, v in
-                in_node.item.training_target_proba.sum(axis=0).iteritems()]
+                zip(in_node.item.training_target_proba.sum(axis=0), explanation.classes_)]
 
         if hasattr(in_node.item, 'gen_target_proba'):
             out_node['generated_samples'] = [
                 {'label': k, 'count': v} for k, v in
-                in_node.item.gen_target_proba.sum(axis=0).iteritems()]
+                zip(in_node.item.training_target_proba.sum(axis=0), explanation.classes_)]
 
         # Record split
         if hasattr(in_node.item, 'split') and in_node.item.split is not None:
@@ -111,34 +111,9 @@ def explanation_to_JSON(explanation, feature_annotations = None):
             for pair in zip(out_node['children'], in_node):
                 stack.push(pair)
         
-        # Node-model specific conversions
-        # should it be the node class' responsibility to implement these?
-        if hasattr(in_node.item, 'probabilities'):
-            out_node['probabilities'] = [{'value': x} for x in in_node.item.probabilities]
-            if hasattr(in_node.item.probabilities, 'index'):
-                for d, i in zip(out_node['probabilities'], in_node.item.probabilities.index):
-                    d['target'] = i #TODO: Remove
-                    d['label'] = i
-        
-        if hasattr(in_node.item, 'model'):
-            model = in_node.item.model
-            # Monkey check for LR/linear model
-            # TODO: Handle case when intercept+coef are multi-d
-            if hasattr(model, 'coef_') and hasattr(model, 'intercept_'):
-                if hasattr(model.intercept_, 'shape'):
-                    intercept = model.intercept_.flat[0]
-                else:
-                    intercept = model.intercept_
-                out_node['logistic_model'] = [{'label': 'intercept', 'value': intercept}]
-                try:
-                    coefficients = [{'label': key, 'value': value}
-                        for (key, value) in zip(explanation.feature_names, model.coef_.flat)
-                        if abs(value) > 0]
-                except:
-                    logger.critical(
-                        'Could not convert logistic model to JSON:'
-                        f'\ncoef_: {model.coef_}')
-                    raise
-                out_node['logistic_model'].extend(coefficients)
+        # Node-model specific conversions should be implemented elsewhere.
+        if hasattr(in_node.item, 'model') and in_node.item.model is not None:
+            # Currently a stup
+            out_node['model'] = str(in_node.item.model)
     
     return json.dumps(root)

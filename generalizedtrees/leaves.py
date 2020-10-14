@@ -49,6 +49,9 @@ class ConstantEstimator(LocalEstimator):
         assert data_matrix.ndim == 2
         
         return np.repeat(np.reshape(self.est_vector, (1,-1)), data_matrix.shape[0], axis=0)
+    
+    def __str__(self):
+        return str(self.est_vector)
 
 
 class SKProbaEstimator(LocalEstimator):

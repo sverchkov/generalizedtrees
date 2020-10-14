@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from operator import itemgetter
+from functools import cached_property
+
 import logging
 import numpy as np
 import pandas as pd
-from functools import cached_property
+
 from generalizedtrees.base import SplitTest
 from generalizedtrees.constraints import LEQConstraint, GTConstraint, EQConstraint, NEQConstraint
 from generalizedtrees.features import category_dtype
@@ -124,16 +127,11 @@ def fayyad_thresholds(data, target, feature):
     splits between adjacent equally labeled values.
 
     :param data: Input data matrix, n-by-d
-    :param target: Target value vector of length n
+    :param target: Target value matrix, n-by-k
     :param feature: Index of splitting feature (integer >=0 and <d)
     """
-    if isinstance(data, pd.DataFrame):
-        v = sorted(zip(data.iloc[:,feature], target))
-        feature_name = data.columns[feature]
-    else:
-        v = sorted(zip(data[:,feature], target))
-        feature_name = None
-
+    v = sorted(zip(data[:,feature], target), key=itemgetter(0))
+    
     # Flag for handling the case when two identical x-values have distinct y-values
     x_collision = False
 
@@ -144,57 +142,18 @@ def fayyad_thresholds(data, target, feature):
         # Only place splits between distinct x-values
         if x_prev < x:
             # Only place splits between distinct y-values
-            if x_collision or y_prev != y:
+            if x_collision or np.any(y_prev != y):
                 split_point = (x_prev + x)/2
-                yield SplitGT(feature, split_point, feature_name=feature_name)
+                yield SplitGT(feature, split_point)
             # Reset collision flag when advancing in x-space
             x_collision = False
         else:
             # Detect y-collision
-            if y_prev != y:
+            if np.any(y_prev != y):
                 x_collision = True
 
-
-def fayyad_thresholds_p(data: pd.DataFrame, target_proba: pd.DataFrame, feature: int):
-    """
-    Generator of splits for numeric (or more generally orderable) values.
-
-    We only generate splits between distinctly labeled distinct adjacent values.
-    This is an adaptation of the original method (for hard labels) to probability vectors.
-    Fayyad and Irani (1992) prove that such splits are always better (in terms of entropy) than
-    splits between adjacent equally labeled values.
-
-    :param data: Input data frame, n-by-d
-    :param target_proba: Target probability data frame, n-by-k
-    :param feature: Index of splitting feature (integer >=0 and <d)
-    """
-    if isinstance(data, pd.DataFrame):
-        v = sorted(zip(data.iloc[:,feature], target_proba.itertuples(index=False)))
-        feature_name = data.columns[feature]
-    else:
-        v = sorted(zip(data[:,feature], target_proba.itertuples(index=False)))
-        feature_name = None
-
-    # Flag for handling the case when two identical x-values have distinct y-values
-    x_collision = False
-
-    for j in range(1, len(v), 1):
-        x_prev, y_prev = v[j-1]
-        x, y = v[j]
-        
-        # Only place splits between distinct x-values
-        if x_prev < x:
-            # Only place splits between distinct y-values
-            if x_collision or any(a != b for a, b in zip(y_prev, y)):
-                split_point = (x_prev + x)/2
-                yield SplitGT(feature, split_point, feature_name=feature_name)
-            # Reset collision flag when advancing in x-space
-            x_collision = False
-        else:
-            # Detect x-collision
-            if y_prev != y:
-                x_collision = True
-
+# TODO: Remove later
+fayyad_thresholds_p = fayyad_thresholds
 
 def one_vs_all(data, feature):
     """

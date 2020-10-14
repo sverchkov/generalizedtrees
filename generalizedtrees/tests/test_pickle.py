@@ -59,6 +59,7 @@ def test_dtc_tree_only_serialization(breast_cancer_data_pandas, caplog):
 
     import logging
     from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.composing import show_node
     from generalizedtrees.tree import tree_to_str
     from pickle import dumps, loads
 
@@ -81,7 +82,7 @@ def test_dtc_tree_only_serialization(breast_cancer_data_pandas, caplog):
     logger.info('Unpickling tree')
     returned_tree = loads(bytes_obj)
 
-    returned_tree_str = tree_to_str(returned_tree)
+    returned_tree_str = tree_to_str(returned_tree, show_node)
     logger.info(f'Unpickled tree:\n{returned_tree_str}')
 
     assert returned_tree_str == tree_str

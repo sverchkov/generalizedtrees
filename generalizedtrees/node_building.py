@@ -27,89 +27,54 @@ from sklearn.linear_model import LogisticRegression
 from generalizedtrees.base import order_by, SplitTest, GreedyTreeBuilder
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.constraints import Constraint
+from generalizedtrees.leaves import ConstantEstimator, SKProbaEstimator
 
 logger = getLogger()
 
 
-# Code common to node implementations
-
-class ProbabilisticClassifierNodeMixin:
-
-    def __str__(self):
-        if self.split is None:
-            return f'Predict {dict(self.probabilities)}'
-        else:
-            return str(self.split)
-    
-    def node_proba(self, data_matrix):
-        n = data_matrix.shape[0]
-
-        return pd.DataFrame([self.probabilities] * n)
-
-
-# For supervised classifiers
-
-class SupervisedClassifierNode(ProbabilisticClassifierNodeMixin):
-
-    def __init__(self, data, targets, target_classes):
-        """
-        Supervised classifier node constructor
-
-        Data: must be pandas dataframe-like
-        Targets: should be pandas series-like.
-        """
-        super().__init__()
-        self.src_data = data
-        self.src_targets = targets
-        self.target_classes = target_classes
-        self.local_constraint = None
-        self.idx = None
-        self.split: Optional[SplitTest] = None
-    
-    @property
-    def data(self):
-        return self.src_data.iloc[self.idx]
-    
-    @property
-    def targets(self):
-        return self.src_targets.iloc[self.idx]
-
-    @cached_property
-    def probabilities(self):
-        slots = pd.Series(0, index=self.target_classes, dtype=np.float)
-        freqs = pd.Series(self.targets).value_counts(normalize=True, sort=False)
-        return slots.add(freqs, fill_value=0.0)
+@dataclass
+class SupervisedClassifierNode:
+    data: np.ndarray
+    targets: np.ndarray
+    split: Optional[SplitTest] = None
+    local_constraint: Optional[Constraint] = None
+    model: Optional[ConstantEstimator] = None
 
 
 class SupCferNodeBuilderMixin:
 
     def create_root(self):
-        node = SupervisedClassifierNode(self.data, self.targets, self.target_classes)
-        node.idx = np.arange(node.src_data.shape[0], dtype=np.intp)
+        node = SupervisedClassifierNode(
+            data = self.data,
+            targets = self.targets,
+            model = ConstantEstimator())
+        
+        node.model.fit(self.targets)
         return node
 
     def generate_children(self, parent):
-        # Note: this can be implemented without referencing tree_model or split.
-        # Is that always the case?
 
         # Get branching for training samples
         branches = parent.split.pick_branches(parent.data)
 
         for b in np.unique(branches):
-            node = SupervisedClassifierNode(self.data, self.targets, self.target_classes)
-            node.idx = parent.idx[branches == b]
-            node.local_constraint = parent.split.constraints[b]
+            idx = branches == b
+            node = SupervisedClassifierNode(
+                data = parent.data[idx, :],
+                targets = parent.targets[idx, :],
+                local_constraint = parent.split.constraints[b],
+                model = ConstantEstimator())
+            
+            node.model.fit(node.targets)
 
-            logger.debug(f'Created node with subview {node.idx}')
             yield node
 
 
 # Builder for trepan
 
-
 @order_by("score")
 @dataclass(init=True, repr=True, eq=False, order=False)
-class TrepanNode(ProbabilisticClassifierNodeMixin):
+class TrepanNode:
 
     training_data: pd.DataFrame
     training_target_proba: pd.DataFrame
@@ -120,18 +85,14 @@ class TrepanNode(ProbabilisticClassifierNodeMixin):
     coverage: float
     generate: Callable
     split: Optional[SplitTest] = None
-
-    @cached_property
-    def probabilities(self):
-        return self.target_proba.mean(axis=0)
-
+    
     @cached_property
     def data(self):
-        return pd.concat([self.training_data, self.gen_data])
+        return np.concatenate([self.training_data, self.gen_data], axis=0)
     
     @cached_property
     def target_proba(self):
-        return pd.concat([self.training_target_proba, self.gen_target_proba])
+        return np.concatenate([self.training_target_proba, self.gen_target_proba], axis=0)
     
     @cached_property
     def score(self):
@@ -139,32 +100,22 @@ class TrepanNode(ProbabilisticClassifierNodeMixin):
     
     @cached_property
     def fidelity(self):
-        # Calculating fidelity as the target probability estimate dotted with itself since
-        # The estimate is also the mean of the sample target probabilities
-        return sum(self.probabilities * self.probabilities)
-    
+        return sum((self.target_proba * self.model.estimate(self.data)).mean(axis=0))
+
     @cached_property
-    def targets(self):
-        # For compatibility with split selectors that use targets
-        try:
-            return self.target_proba.idxmax(axis=1)
-        except:
-            logger.critical(
-                'Something went wrong when inferring hard target classes.'
-                'Target probability vector:'
-                f'\n{self.target_proba}')
-            raise
+    def model(self) -> ConstantEstimator:
+        return ConstantEstimator().fit(self.target_proba)
 
 
-def safe_ask_oracle(data_frame, oracle, result_columns):
+def safe_ask_oracle(data_matrix, oracle, d):
 
-    if data_frame.shape[0] < 1:
-        return pd.DataFrame(columns=result_columns)
+    if data_matrix.shape[0] < 1:
+        return np.empty((0, d))
         
     else:
-        result = oracle(data_frame)
-        if not isinstance(result, pd.DataFrame):
-            result = pd.DataFrame(result, columns=result_columns)
+        result = oracle(data_matrix)
+        if not isinstance(result, np.ndarray):
+            result = result.to_numpy()
         return result
 
 
@@ -195,7 +146,7 @@ class OGCferNodeBuilderMixin:
         gen_data = draw_sample(
             constraints,
             self.min_samples - len(self.data),
-            self.data.columns,
+            self._d,
             generate)
         
         return Node(
@@ -204,7 +155,7 @@ class OGCferNodeBuilderMixin:
             local_constraint=None,
             constraints=constraints,
             gen_data=gen_data,
-            gen_target_proba=safe_ask_oracle(gen_data, self.oracle, target_proba.columns),
+            gen_target_proba=safe_ask_oracle(gen_data, self.oracle, target_proba.shape[1]),
             coverage=1.0,
             generate=generate)
 
@@ -252,7 +203,7 @@ class OGCferNodeBuilderMixin:
                 gen_data = draw_sample(
                     constraints,
                     self.min_samples - len(training_data),
-                    self.data.columns,
+                    self._d,
                     generate)
 
                 yield Node(
@@ -264,23 +215,23 @@ class OGCferNodeBuilderMixin:
                     gen_target_proba = safe_ask_oracle(
                         gen_data,
                         self.oracle,
-                        parent.training_target_proba.columns),
+                        parent.training_target_proba.shape[1]),
                     coverage = coverage,
                     generate = generate)
 
 
 # Utility functions (TODO: Find a better-named home)
 
-def draw_sample(constraints, n, columns, generator):
+def draw_sample(constraints, n, d, generator):
     # Draws samples one at a time.
     # May be worth optimizing.
 
     logger.debug(f'Drawing sample of size {n}')
 
     if n < 1:
-        return pd.DataFrame(columns=columns)
+        return np.zeros((0, d))
     else:
-        return pd.DataFrame([draw_instance(constraints, generator) for _ in range(n)])
+        return np.array([draw_instance(constraints, generator) for _ in range(n)])
 
 def draw_instance(constraints, generate, max_attempts=1000):
 
@@ -331,7 +282,7 @@ def same_distribution(data_1, data_2, /, feature_spec, alpha):
         
         else:
             # KS-test
-            _, p = ks_2samp(data_1.iloc[:, i], data_2.iloc[:, i])
+            _, p = ks_2samp(data_1[:, i], data_2[:, i])
             if p < min_p:
                 min_p = p
             n_tests += 1
@@ -340,15 +291,15 @@ def same_distribution(data_1, data_2, /, feature_spec, alpha):
 
 
 @dataclass(init=True, repr=True, eq=False, order=False)
-class BATNode(ProbabilisticClassifierNodeMixin):
-    data: pd.DataFrame
-    target_proba: pd.DataFrame
+class BATNode:
+    data: np.ndarray
+    target_proba: np.ndarray
     training_idx: np.ndarray
     gen_idx: np.ndarray
     local_constraint: Optional[Constraint]
     constraints: Tuple[Constraint]
-    probabilities: pd.Series
     cost: float
+    model: ConstantEstimator
     split: Optional[SplitTest] = None
 
 
@@ -374,7 +325,7 @@ class BATNodeBuilderMixin:
         if known_training_idx is None:
             known_training_idx = np.array([
                 i for i in range(self.data.shape[0])
-                if all(c.test(self.data.iloc[i, :]) for c in constraints)
+                if all(c.test(self.data[i, :]) for c in constraints)
             ], dtype=np.intp)
         
         if not hasattr(self, "_generated_samples"):
@@ -421,32 +372,36 @@ class BATNodeBuilderMixin:
 
 
     def create_root(self):
+        # Inefficiency: We already compute something equivalent at fit time
         self._target_proba = self.oracle(self.data)
-
-        if not isinstance(self._target_proba, pd.DataFrame):
-            self._target_proba = pd.DataFrame(self._target_proba)
         
         constraints = ()
 
         gen_data, training_idx, gen_idx, prop_accepted = self._fetch_sample(constraints)
 
         # Precompute probabilities
-        target_proba = pd.concat([
+        target_proba = np.concatenate([
             self._target_proba,
-            safe_ask_oracle(gen_data, self.oracle, self._target_proba.columns)
-            ], ignore_index=True)
+            safe_ask_oracle(gen_data, self.oracle, self._target_proba.shape[1])
+            ], axis=0)
+        
+        model = ConstantEstimator().fit(target_proba)
         probabilities = target_proba.mean(axis=0)
 
         cost = prop_accepted * (1 - max(probabilities))
         
+        data_source = self.data[training_idx, :]
+        if len(gen_data) > 1:
+            data_source = np.concatenate([data_source, gen_data], axis=0)
+
         return BATNode(
-            data=self.data.iloc[training_idx, :].append(gen_data, ignore_index=True),
+            data=data_source,
             target_proba=target_proba,
             training_idx=training_idx,
             gen_idx=gen_idx,
             local_constraint=None,
             constraints=constraints,
-            probabilities=probabilities,
+            model=model,
             cost=cost)
 
     def generate_children(self, parent):
@@ -480,21 +435,22 @@ class BATNodeBuilderMixin:
 
             # Precompute probabilities
             target_proba = pd.concat([
-                self._target_proba[training_idx],
-                safe_ask_oracle(gen_data, self.oracle, self._target_proba.columns)
+                self._target_proba[training_idx, :],
+                safe_ask_oracle(gen_data, self.oracle, parent._target_proba.shape[1])
                 ],ignore_index=True)
+            model = ConstantEstimator().fit(target_proba)
             probabilities = target_proba.mean(axis=0)
 
             cost = prop_accepted * (1 - max(probabilities))
 
             yield BATNode(
-                data=self.data.iloc[training_idx, :].append(gen_data, ignore_index=True),
+                data=self.data[training_idx, :].append(gen_data, ignore_index=True),
                 target_proba=target_proba,
                 training_idx=training_idx,
                 gen_idx=gen_idx,
                 local_constraint=local_constraint,
                 constraints=constraints,
-                probabilities=probabilities,
+                model=model,
                 cost=cost)
 
 
@@ -507,12 +463,12 @@ class BATNodeBuilderMixin:
 @dataclass(init=True, repr=True, eq=False, order=False)
 class TLLNode:
 
-    training_data: pd.DataFrame
-    training_target_proba: pd.DataFrame
+    training_data: np.ndarray
+    training_target_proba: np.ndarray
     local_constraint: Optional[Constraint]
     constraints: Tuple[Constraint]
-    gen_data: pd.DataFrame
-    gen_target_proba: pd.DataFrame
+    gen_data: np.ndarray
+    gen_target_proba: np.ndarray
     coverage: float
     generate: Callable
     split: Optional[SplitTest] = None
@@ -523,26 +479,27 @@ class TLLNode:
         else:
             return str(self.split)
     
-    def node_proba(self, data_matrix):
-        model = self.model
-        return pd.DataFrame(model.predict_proba(data_matrix), columns=model.classes_)
-
     @cached_property
-    def model(self):
+    def model(self) -> SKProbaEstimator:
 
         # TODO: Expose LR parameters to the outside
-        lr = LogisticRegression(penalty='l1', C=0.1, multi_class='multinomial', solver='saga')
+        est = SKProbaEstimator(
+            LogisticRegression(
+                penalty='l1',
+                C=0.1,
+                multi_class='multinomial',
+                solver='saga')
+        )
 
         # Prepare data for fit
         # Use sample weights to communicate probabilities to the learner
-        p_y = self.target_proba
-        n, m = p_y.shape
+        n, m = self.target_proba.shape
 
-        lr_data = pd.concat([self.data]*m, axis=0, ignore_index=True)
-        lr_sample_weights = p_y.to_numpy(dtype=float).flatten()
-        lr_targets = np.repeat(p_y.columns.to_numpy(), n)
+        lr_data = np.concatenate([self.data]*m, axis=0)
+        lr_sample_weights = self.target_proba.flatten()
+        lr_targets = np.repeat(np.arange(m), n)
 
-        return lr.fit(lr_data, lr_targets, sample_weight=lr_sample_weights)
+        return est.fit(lr_data, lr_targets, sample_weight=lr_sample_weights)
 
     @cached_property
     def classifier(self):
@@ -550,11 +507,11 @@ class TLLNode:
 
     @cached_property
     def data(self):
-        return pd.concat([self.training_data, self.gen_data])
+        return np.concatenate([self.training_data, self.gen_data], axis=0)
     
     @cached_property
-    def target_proba(self):
-        return pd.concat([self.training_target_proba, self.gen_target_proba])
+    def target_proba(self) -> np.ndarray:
+        return np.concatenate([self.training_target_proba, self.gen_target_proba], axis=0)
     
     @cached_property
     def score(self):
@@ -562,7 +519,7 @@ class TLLNode:
     
     @cached_property
     def fidelity(self):
-        return sum((self.target_proba * self.node_proba(self.data)).mean(axis=0))
+        return sum((self.target_proba * self.model.estimate(self.data)).mean(axis=0))
 
     @cached_property
     def targets(self):

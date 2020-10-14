@@ -24,8 +24,18 @@ from logging import getLogger
 logger = getLogger()
 
 # Show tree
+def show_node(node_obj):
+    if node_obj.split is None:
+        if node_obj.model is None:
+            logger.critical('Malformed node encountered in tree printing.')
+            return "Malformed node"
+        else:
+            return str(node_obj.model)
+    else:
+        return str(node_obj.split)
+
 def show_tree(model_obj):
-    return tree_to_str(model_obj.tree)
+    return tree_to_str(model_obj.tree, show_node)
 
 # Composing a split constructor
 

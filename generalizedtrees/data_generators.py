@@ -19,20 +19,19 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 
-def trepan_generator(tree_model, training_data: pd.DataFrame):
+def trepan_generator(tree_model, training_data: np.ndarray):
     """
     The data generation scheme used in Trepan
     """
 
     d = training_data.shape[1]
-    cols = training_data.columns
 
     # The Trepan generator independently generates the individual feature values.
     feature_generators = [
-        _feature_generator(training_data.iloc[:,i], tree_model.feature_spec[i])
+        _feature_generator(training_data[:,i], tree_model.feature_spec[i])
         for i in range(d)]
 
-    return lambda: pd.Series([f() for f in feature_generators], index=cols)
+    return lambda: np.array([f() for f in feature_generators])
 
 def _feature_generator(data_vector, feature: FeatureSpec, rng=np.random.default_rng()):
 
@@ -55,7 +54,7 @@ def _feature_generator(data_vector, feature: FeatureSpec, rng=np.random.default_
     else:
         raise ValueError(f"I don't know how to handle feature spec {feature}")
 
-def smearing(tree_model, training_data: pd.DataFrame):
+def smearing(tree_model, training_data: np.ndarray):
     r"""
     The data generation scheme used in Born Again Trees
 
@@ -78,10 +77,10 @@ def smearing(tree_model, training_data: pd.DataFrame):
     n, d = training_data.shape
 
     def gen():
-        base_instance = training_data.iloc[tree_model.rng.integers(n)].copy()
+        base_instance = training_data[tree_model.rng.integers(n)].copy()
         for i in range(d):
             if tree_model.rng.random() < tree_model.p_alt:
-                base_instance.iloc[i] = tree_model.rng.choice(training_data.iloc[:, i])
+                base_instance[i] = tree_model.rng.choice(training_data[:, i])
 
     return gen
 

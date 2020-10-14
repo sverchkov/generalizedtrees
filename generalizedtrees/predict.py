@@ -70,9 +70,9 @@ class BaseTreeClassifierMixin:
         max_idx = proba.argmax(axis=1)
 
         if as_labels:
-            self.classes_[max_idx]
+            return self.classes_[max_idx]
         else:
-            max_idx
+            return max_idx
 
 
 class TreeClassifierMixin(BaseTreeClassifierMixin):
@@ -82,6 +82,9 @@ class TreeClassifierMixin(BaseTreeClassifierMixin):
     # self.classes_ (A numpy array of class labels)
 
     def predict_proba(self, data_matrix, as_dataframe=False):
+
+        if isinstance(data_matrix, DataFrame):
+            data_matrix = data_matrix.to_numpy()
 
         proba = estimate(self.tree, data_matrix, len(self.classes_))
 

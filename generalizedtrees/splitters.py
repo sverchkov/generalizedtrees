@@ -81,7 +81,7 @@ def information_gain_p(split, data, target_proba):
     branches = split.pick_branches(data)
 
     return entropy_of_p_matrix(target_proba) - sum(map(
-        lambda b: entropy_of_p_matrix(target_proba[branches==b]),
+        lambda b: entropy_of_p_matrix(target_proba[branches==b, :]),
         np.unique(branches)
     ))
 
