@@ -260,10 +260,10 @@ def same_distribution(data_1, data_2, /, feature_spec, alpha):
             # Note: we're assuming that the union of values present in the samples is
             # the set of possible values. This is not all possible values that the
             # variable could originally take.
-            v1, c1 = np.unique(data_1.iloc[:, i], return_counts=True)
+            v1, c1 = np.unique(data_1[:, i], return_counts=True)
             map1 = {v1[j]: c1[j] for j in range(len(v1))}
 
-            v2, c2 = np.unique(data_2.iloc[:, i], return_counts=True)
+            v2, c2 = np.unique(data_2[:, i], return_counts=True)
             map2 = {v2[j]: c2[j] for j in range(len(v2))}
 
             values = np.union1d(v1, v2)
