@@ -76,12 +76,12 @@ class SupCferNodeBuilderMixin:
 @dataclass(init=True, repr=True, eq=False, order=False)
 class TrepanNode:
 
-    training_data: pd.DataFrame
-    training_target_proba: pd.DataFrame
+    training_data: np.ndarray
+    training_target_proba: np.ndarray
     local_constraint: Optional[Constraint]
     constraints: Tuple[Constraint]
-    gen_data: pd.DataFrame
-    gen_target_proba: pd.DataFrame
+    gen_data: np.ndarray
+    gen_target_proba: np.ndarray
     coverage: float
     generate: Callable
     split: Optional[SplitTest] = None

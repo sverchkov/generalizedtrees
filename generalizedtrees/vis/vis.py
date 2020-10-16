@@ -113,7 +113,7 @@ def explanation_to_JSON(explanation, feature_annotations = None):
         
         # Node-model specific conversions should be implemented elsewhere.
         if hasattr(in_node.item, 'model') and in_node.item.model is not None:
-            # Currently a stup
+            # Currently a stump
             out_node['model'] = str(in_node.item.model)
     
     return json.dumps(root)
