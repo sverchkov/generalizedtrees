@@ -18,6 +18,7 @@ def test_tll(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
 
     from generalizedtrees.recipes import TLL
     from generalizedtrees.vis import explanation_to_JSON
+    from generalizedtrees.vis.vis import explanation_to_simplified
     import pandas as pd
     from time import perf_counter
     import logging
@@ -51,6 +52,7 @@ def test_tll(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
     logger.info(f'Learned tree:\n{explain.show_tree()}')
 
     # Test JSON
+    logger.info(f'Simplified: {explanation_to_simplified(explain)}')
     logger.info(f'JSON: {explanation_to_JSON(explain)}')
 
     # Make predictions

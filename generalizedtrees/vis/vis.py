@@ -18,6 +18,7 @@ import pkgutil
 import json
 from logging import getLogger
 from generalizedtrees.queues import Stack
+from generalizedtrees.vis.models import model_to_simplified
 import generalizedtrees.constraints as cons
 
 logger = getLogger()
@@ -65,6 +66,10 @@ def _get_constraint_type_as_html_string(constraint):
 
 
 def explanation_to_JSON(explanation, feature_annotations = None):
+    return json.dumps(explanation_to_simplified(explanation, feature_annotations))
+
+
+def explanation_to_simplified(explanation, feature_annotations = None):
 
     root = dict()
 
@@ -114,6 +119,6 @@ def explanation_to_JSON(explanation, feature_annotations = None):
         # Node-model specific conversions should be implemented elsewhere.
         if hasattr(in_node.item, 'model') and in_node.item.model is not None:
             # Currently a stump
-            out_node['model'] = str(in_node.item.model)
+            out_node['model'] = model_to_simplified(in_node.item.model, explanation)
     
-    return json.dumps(root)
+    return root

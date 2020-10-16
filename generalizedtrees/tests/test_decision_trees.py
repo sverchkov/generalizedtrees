@@ -102,6 +102,7 @@ def test_dtc_json(breast_cancer_data_pandas, caplog):
     import pandas as pd
     from generalizedtrees.recipes import DecisionTreeClassifier
     from generalizedtrees.vis import explanation_to_JSON
+    from generalizedtrees.vis.vis import explanation_to_simplified
 
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
@@ -116,5 +117,7 @@ def test_dtc_json(breast_cancer_data_pandas, caplog):
     logger.info(f'Learned tree:\n{dtc.show_tree()}')
 
     annotation = pd.DataFrame({'names': breast_cancer_data_pandas.x_train.columns})
+
+    logger.info(f'Simplified: {explanation_to_simplified(dtc, annotation)}')
 
     logger.info(f'JSON: {explanation_to_JSON(dtc, annotation)}')
