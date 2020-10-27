@@ -14,12 +14,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Protocol
+from typing import Iterable, Protocol, NamedTuple, Any, Union, runtime_checkable, Dict, Set
+from collections import defaultdict
 from abc import ABC, abstractmethod
-from enum import Flag, auto
+from enum import Enum, Flag, auto
 import numpy as np
 
 
+class Op(Enum):
+    EQ = '='
+    NEQ = '\u2260'
+    LT = '<'
+    GT = '>'
+    LEQ = '\u2264'
+    GEQ = '\u2265'
+
+    def __invert__(self):
+        if self is Op.EQ: return Op.NEQ
+        if self is Op.NEQ: return Op.EQ
+        if self is Op.LT: return Op.GEQ
+        if self is Op.GT: return Op.LEQ
+        if self is Op.LEQ: return Op.GT
+        if self is Op.GEQ: return Op.LT
+        raise ValueError(self)
+
+    def test(self, a, b, /):
+        if self is Op.EQ: return a == b
+        if self is Op.NEQ: return a != b
+        if self is Op.LT: return a < b
+        if self is Op.GT: return a > b
+        if self is Op.LEQ: return a <= b
+        if self is Op.GEQ: return a >= b
+
+_orderless = (Op.EQ, Op.NEQ)
+
+_op2bits = {
+    Op.EQ: 0b010,
+    Op.NEQ: 0b101,
+    Op.LT: 0b100,
+    Op.GT: 0b001,
+    Op.LEQ: 0b110,
+    Op.GEQ: 0b011
+}
+
+_bits2op = {val: key for key, val in _op2bits.items()}
+
+@runtime_checkable
 class Constraint(Protocol):
 
     @abstractmethod
@@ -42,125 +82,38 @@ class NegatedConstraint(Constraint):
         return self._constraint
 
 
-class SingleFeatureConstraint(Constraint):
+class SimpleConstraint(NamedTuple):
+    """
+    Single feature axis-alisned constraint.
 
-    def __init__(self, feature_index):
-        self._feature = feature_index
-
-    @property
-    def feature(self):
-        return self._feature
+    Defined in terms of a feature index, operator, and value
+    """
+    feature: int
+    operator: Op
+    value: Any
 
     def test(self, sample):
-        return self.test_value(sample[self._feature])
-
-    @abstractmethod
-    def test_value(self, value):
-        pass
-
-
-class LEQConstraint(SingleFeatureConstraint):
-
-    def __init__(self, feature_index, value):
-        self._value = value
-        super().__init__(feature_index)
-
-    @property
-    def value(self):
-        return self._value
-
-    def test_value(self, value):
-        return value <= self._value
-
+        return self.operator.test(sample[self.feature], self.value)
+    
     def __invert__(self):
-        return GTConstraint(self.feature, self._value)
+        return SimpleConstraint(self.feature, ~self.operator, self.value)
+    
+    def __str__(self):
+        return f'x[{self.feature}] {self.operator.value} {self.value}'
+    
 
-    def __repr__(self):
-        return f"[{self.feature}]<={self._value}"
+# Backwards compatibility aliases
+def LEQConstraint(feature_index, value):
+    return SimpleConstraint(feature_index, Op.LEQ, value)
 
-    def __eq__(self, other):
-        return other is self or \
-            (isinstance(other, LEQConstraint) and
-            other.feature == self.feature and
-            other.value == self.value)
+def GTConstraint(feature_index, value):
+    return SimpleConstraint(feature_index, Op.GT, value)
 
+def EQConstraint(feature_index, value):
+    return SimpleConstraint(feature_index, Op.EQ, value)
 
-class GTConstraint(SingleFeatureConstraint):
-
-    def __init__(self, feature_index, value):
-        self._value = value
-        super().__init__(feature_index)
-
-    @property
-    def value(self):
-        return self._value
-
-    def test_value(self, value):
-        return value > self._value
-
-    def __invert__(self):
-        return LEQConstraint(self.feature, self._value)
-
-    def __repr__(self):
-        return f"[{self.feature}]>{self._value}"
-
-    def __eq__(self, other):
-        return other is self or \
-            (isinstance(other, GTConstraint) and
-            other.feature == self.feature and
-            other.value == self.value)
-
-
-class EQConstraint(SingleFeatureConstraint):
-
-    def __init__(self, feature_index, value):
-        self._value = value
-        super().__init__(feature_index)
-
-    @property
-    def value(self):
-        return self._value
-
-    def test_value(self, value):
-        return value == self.value
-
-    def __invert__(self):
-        return NEQConstraint(self.feature, self.value)
-
-    def __repr__(self):
-        return f"[{self.feature}]=={self.value}"
-
-    def __eq__(self, other):
-        return other is self or \
-            (isinstance(other, EQConstraint) and
-            other.feature == self.feature and
-            other.value == self.value)
-
-
-class NEQConstraint(SingleFeatureConstraint):
-
-    def __init__(self, feature_index, value):
-        self._value = value
-        super().__init__(feature_index)
-
-    @property
-    def value(self):
-        return self._value
-
-    def test_value(self, value):
-        return value != self.value
-
-    def __invert__(self):
-        return EQConstraint(self.feature, self.value)
-
-    def __repr__(self):
-        return f"[{self.feature}]!={self.value}"
-
-    def __eq__(self, other):
-        return other is self or \
-            (isinstance(other, NEQConstraint) and
-            other.feature == self.feature and
-            other.value == self.value)
+def NEQConstraint(feature_index, value):
+    return SimpleConstraint(feature_index, Op.NEQ, value)
 
 
 class MofN(Constraint):
@@ -236,17 +189,17 @@ class MofN(Constraint):
                 yield MofN(new_m, constraint.constraints)
         
 
-def vectorize_constraints(constraints, dimensions):
+def vectorize_constraints(constraints: Iterable[SimpleConstraint], dimensions: int):
     upper = np.full(dimensions, np.inf)
     lower = np.full(dimensions, -np.inf)
     upper_eq = np.full(dimensions, True)
     lower_eq = np.full(dimensions, False)
 
     for constraint in constraints:
-        if isinstance(constraint, GTConstraint):
+        if constraint.operator is Op.GT:
             if lower[constraint.feature] < constraint.value:
                 lower[constraint.feature] = constraint.value
-        elif isinstance(constraint, LEQConstraint):
+        elif constraint.operator is Op.LEQ:
             if upper[constraint.feature] > constraint.value:
                 upper[constraint.feature] = constraint.value
         else:
@@ -261,3 +214,26 @@ def test_all_x(constraints):
 
 def test_all_tuples(constraints):
     return lambda pair: test_all_x(constraints)(pair[0])
+
+def simplify_conjunction(*constraints: SimpleConstraint) -> Union[bool, Iterable[Constraint]]:
+    """
+    Simplify a conjunction ('and') of constraints into minimal form.
+
+    Currently only supports atomic constraints.
+    Reduces a list of constraints to a minimal list of constrains (e.g. if input is x_1 < 2 and
+    x_1 < 3, the output will only by x_1 < 2)
+    """
+
+    # TODO: Need to think about how to do this.
+
+    raise NotImplementedError("Not implemented yet.")
+
+def simplify_disjunction(*constraints):
+    """
+    Simplify a disjunction ('or') of constraints into minimal form.
+
+    Currently only supports atomic constraints.
+    Reduces a list of constraints to a minimal list of constrains (e.g. if input is x_1 < 2 and
+    x_1 < 3, the output will only by x_1 < 3)
+    """
+    raise NotImplementedError("Not implemented yet.")
