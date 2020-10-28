@@ -83,4 +83,4 @@ class BinSKProbaEstimator(LocalEstimator):
         return self
 
     def estimate(self, data_matrix: np.ndarray) -> np.ndarray:
-        return self.classifier.predict_proba(data_matrix)[:,1]
+        return self.classifier.predict_proba(data_matrix)[:,[1]]

@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from generalizedtrees.leaves import ConstantEstimator, SKProbaEstimator
-from numpy import generic, ndarray
+from numpy import generic, ndarray, concatenate, array
 from logging import getLogger
 
 logger = getLogger()
@@ -45,11 +45,21 @@ def _ensure_native(scalar):
     return scalar
 
 def _constant_estimator_to_simplified(model: ConstantEstimator, explanation):
+
+    # Check case of n-1-d estimator for n-ary classification
+    est_vector = model.est_vector
+    try:
+        if len(est_vector) < len(explanation.classes_):
+            est_vector = concatenate([array([1-est_vector.sum()]), est_vector], axis=0)
+    except IndexError:
+        # est_vector must be scalar?
+        est_vector = [1-est_vector, est_vector] # Don't have to use numpy arrays here
+
     return {'estimate': [
         {
             'label_id': i,
             'label': _ensure_native(explanation.classes_[i]),
-            'value': _ensure_native(model.est_vector[i])}
+            'value': _ensure_native(est_vector[i])}
         for i in range(len(explanation.classes_))]}
 
 def _skl_linear_estimator_to_simplified(model: SKProbaEstimator, explanation, epsilon=1E-6):

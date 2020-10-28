@@ -225,8 +225,8 @@ class OGCferNodeBuilderMixin:
 
 
 # Utility functions (TODO: Find a better-named home)
-MAX_SAMPLING_ATTEMPTS = 1000 #10000
-MAX_SAMPLES_PER_ROUND = 1000 #100000000
+MAX_SAMPLING_ATTEMPTS = 10 #10000
+MAX_SAMPLES_PER_ROUND = 10000 #100000000
 
 def draw_sample(constraints, n, d, generator, max_attempts = MAX_SAMPLING_ATTEMPTS, max_sample = MAX_SAMPLES_PER_ROUND, on_timeout = 'partial'):
     
@@ -241,7 +241,7 @@ def draw_sample(constraints, n, d, generator, max_attempts = MAX_SAMPLING_ATTEMP
         for _ in range(max_attempts):
             needed = n - i
             n_sampled = round(min(needed * oversample_prop, max_sample))
-            sample = np.row_stack([generator() for _ in range(n_sampled)])
+            sample = generator(n_sampled)
             accepted = test(constraints, sample)
             n_acc = sum(accepted)
             n_fit = min(n_acc, needed)
@@ -252,7 +252,7 @@ def draw_sample(constraints, n, d, generator, max_attempts = MAX_SAMPLING_ATTEMP
             i += n_fit
             if i >= n:
                 return result
-            oversample_prop = max(oversample_prop, n_sampled / n_acc)
+            oversample_prop = max(oversample_prop, n_sampled / n_acc) if n_acc > 0 else np.inf
         
         logger.critical('Could not generate an acceptable sample within a reasonable time.')
         logger.debug(f'Failed to generate a sample for constraints: {constraints}')
@@ -630,7 +630,7 @@ class BTLLNode:
     def targets(self):
         # For compatibility with split selectors that use targets
         try:
-            return self.target_proba.argmax(axis=1)
+            return self.target_proba.argmax(axis=1).reshape(-1,1)
         except:
             logger.critical(
                 'Something went wrong when inferring hard target classes.'

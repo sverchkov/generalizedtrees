@@ -22,7 +22,7 @@ from generalizedtrees.splitters import information_gain, information_gain_p, \
 from generalizedtrees.queues import Stack, Heap
 from generalizedtrees.stopping import never, node_depth, tree_size_limit
 import generalizedtrees.node_building as nb
-from generalizedtrees.data_generators import trepan_generator, smearing
+from generalizedtrees.data_generators import trepan_generator, trepan_generator_n, smearing
 
 DecisionTreeClassifier = greedy_classification_tree_learner(
     name="DecisionTreeClassifier",
@@ -153,7 +153,7 @@ TLL3 = greedy_binary_classification_tree_learner(
     node_building=nb.OGCferNodeBuilderMixin,
     split_candidate_generator=make_split_candidates_p,
     split_score=ijcai19_lr_gradient_slow,
-    data_generator=trepan_generator,
+    data_generator=trepan_generator_n,
     queue=Heap,
     global_stop=tree_size_limit,
     local_stop=never,

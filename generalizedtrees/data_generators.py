@@ -37,7 +37,7 @@ def trepan_generator_n(tree_model, training_data: np.ndarray):
         _n_feature_generator(training_data[:,i], tree_model.feature_spec[i])
         for i in range(d)]
 
-    return lambda n: np.array([f(n) for f in feature_generators])
+    return lambda n: np.column_stack([f(n) for f in feature_generators])
 
 
 def _n_feature_generator(data_vector, feature: FeatureSpec, rng=np.random.default_rng()):
