@@ -237,3 +237,16 @@ def simplify_disjunction(*constraints):
     x_1 < 3, the output will only by x_1 < 3)
     """
     raise NotImplementedError("Not implemented yet.")
+
+
+def test(constraints: Iterable[SimpleConstraint], data_matrix):
+    n, _ = data_matrix.shape
+
+    result = np.ones(n, dtype=np.bool)
+
+    for c in constraints:
+        # * is the 'and' operator for boolean ndarrays
+        result *= c.operator.test(data_matrix[:, c.feature], c.value)
+    
+    return result
+

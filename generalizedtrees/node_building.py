@@ -26,8 +26,8 @@ from sklearn.linear_model import LogisticRegression
 
 from generalizedtrees.base import order_by, SplitTest, GreedyTreeBuilder
 from generalizedtrees.features import FeatureSpec
-from generalizedtrees.constraints import Constraint
-from generalizedtrees.leaves import ConstantEstimator, SKProbaEstimator
+from generalizedtrees.constraints import Constraint, test
+from generalizedtrees.leaves import ConstantEstimator, SKProbaEstimator, BinSKProbaEstimator
 
 logger = getLogger()
 
@@ -107,15 +107,22 @@ class TrepanNode:
         return ConstantEstimator().fit(self.target_proba)
 
 
-def safe_ask_oracle(data_matrix, oracle, d):
+def safe_ask_oracle(data_matrix, oracle, k = None):
 
-    if data_matrix.shape[0] < 1:
-        return np.empty((0, d))
+    n, _ = data_matrix.shape
+
+    if k is not None and n < 1:
+        return np.empty((0, k))
         
     else:
         result = oracle(data_matrix)
         if not isinstance(result, np.ndarray):
+            logger.warning(f'Oracle yielding a {type(result)}, expected numpy array')
             result = result.to_numpy()
+        rs = result.shape
+        if len(rs) != 2:
+            logger.warning(f'Oracle yielding result of shape {rs}, expected 2-d matrix')
+            result.reshape(n,-1)
         return result
 
 
@@ -135,10 +142,7 @@ class OGCferNodeBuilderMixin:
 
         Node = getattr(self, "node_cls", TrepanNode)
 
-        target_proba = self.oracle(self.data)
-
-        if not isinstance(target_proba, pd.DataFrame):
-            target_proba = pd.DataFrame(target_proba)
+        target_proba = safe_ask_oracle(self.data, self.oracle)
         
         constraints = ()
         generate = self.new_generator(self.data)
@@ -221,17 +225,46 @@ class OGCferNodeBuilderMixin:
 
 
 # Utility functions (TODO: Find a better-named home)
+MAX_SAMPLING_ATTEMPTS = 1000 #10000
+MAX_SAMPLES_PER_ROUND = 1000 #100000000
 
-def draw_sample(constraints, n, d, generator):
-    # Draws samples one at a time.
-    # May be worth optimizing.
-
+def draw_sample(constraints, n, d, generator, max_attempts = MAX_SAMPLING_ATTEMPTS, max_sample = MAX_SAMPLES_PER_ROUND, on_timeout = 'partial'):
+    
     logger.debug(f'Drawing sample of size {n}')
 
     if n < 1:
         return np.zeros((0, d))
     else:
-        return np.array([draw_instance(constraints, generator) for _ in range(n)])
+        result = np.empty((n, d))
+        i = 0
+        oversample_prop = 1
+        for _ in range(max_attempts):
+            needed = n - i
+            n_sampled = round(min(needed * oversample_prop, max_sample))
+            sample = np.row_stack([generator() for _ in range(n_sampled)])
+            accepted = test(constraints, sample)
+            n_acc = sum(accepted)
+            n_fit = min(n_acc, needed)
+            logger.debug(
+                f'Sampling loop: i={i}, n={n}. '
+                f'Needed {needed} samples, sampled {n_sampled}, accepted {n_acc}, fit {n_fit}')
+            result[i:(i+n_fit),:] = sample[accepted,:][0:n_fit,:]
+            i += n_fit
+            if i >= n:
+                return result
+            oversample_prop = max(oversample_prop, n_sampled / n_acc)
+        
+        logger.critical('Could not generate an acceptable sample within a reasonable time.')
+        logger.debug(f'Failed to generate a sample for constraints: {constraints}')
+        if on_timeout == 'partial':
+            logger.warning('Returning partial sample')
+            return result[1:i,:]
+        elif on_timeout == 'dirty':
+            logger.warning('Matrix with uninitialized elements')
+            return result
+        else: # on_timeout == 'raise':
+            raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
+
 
 def draw_instance(constraints, generate, max_attempts=1000):
 
@@ -242,7 +275,6 @@ def draw_instance(constraints, generate, max_attempts=1000):
     
     logger.critical('Could not generate an acceptable sample within a reasonable time.')
     logger.debug(f'Failed to generate a sample for constraints: {constraints}')
-    raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
 
 def same_distribution(data_1, data_2, /, feature_spec, alpha):
     """
@@ -526,6 +558,79 @@ class TLLNode:
         # For compatibility with split selectors that use targets
         try:
             return self.target_proba.idxmax(axis=1)
+        except:
+            logger.critical(
+                'Something went wrong when inferring hard target classes.'
+                'Target probability vector:'
+                f'\n{self.target_proba}')
+            raise
+
+
+@order_by("score")
+@dataclass(init=True, repr=True, eq=False, order=False)
+class BTLLNode:
+
+    training_data: np.ndarray
+    training_target_proba: np.ndarray
+    local_constraint: Optional[Constraint]
+    constraints: Tuple[Constraint]
+    gen_data: np.ndarray
+    gen_target_proba: np.ndarray
+    coverage: float
+    generate: Callable
+    split: Optional[SplitTest] = None
+
+    def __str__(self):
+        if self.split is None:
+            return str(self.model)
+        else:
+            return str(self.split)
+    
+    @cached_property
+    def model(self) -> SKProbaEstimator:
+
+        targets = self.targets
+
+        _, k = np.unique(targets, return_counts=True)
+        if len(k) < 2:
+            return ConstantEstimator().fit(targets)
+
+        # TODO: Expose LR parameters to the outside
+        est = BinSKProbaEstimator(
+            LogisticRegression(
+                penalty='l1',
+                C=0.1,
+                solver='saga')
+        )
+
+        return est.fit(self.data, targets)
+
+    @cached_property
+    def classifier(self):
+        return self.target_proba.mean(axis=0)
+
+    @cached_property
+    def data(self):
+        return np.concatenate([self.training_data, self.gen_data], axis=0)
+    
+    @cached_property
+    def target_proba(self) -> np.ndarray:
+        return np.concatenate([self.training_target_proba, self.gen_target_proba], axis=0)
+    
+    @cached_property
+    def score(self):
+        return -(self.coverage * (1 - self.fidelity))
+    
+    @cached_property
+    def fidelity(self):
+        model_est = self.model.estimate(self.data)
+        return np.mean(self.targets * model_est + (1 - self.targets) * (1 - model_est))
+
+    @cached_property
+    def targets(self):
+        # For compatibility with split selectors that use targets
+        try:
+            return self.target_proba.argmax(axis=1)
         except:
             logger.critical(
                 'Something went wrong when inferring hard target classes.'

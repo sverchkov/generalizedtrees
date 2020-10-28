@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from dataclasses import field
-from generalizedtrees.composing import greedy_classification_tree_learner, compose_split_constructor_mk2
+from generalizedtrees.composing import greedy_classification_tree_learner, greedy_binary_classification_tree_learner, compose_split_constructor_mk2
 from generalizedtrees.fitters import supervised_data_fit, fit_with_data_and_oracle
 from generalizedtrees.splitters import information_gain, information_gain_p, \
     make_split_candidates, make_split_candidates_p, ijcai19_lr_gradient_slow
@@ -122,6 +122,28 @@ TLL2 = greedy_classification_tree_learner(
         name="TLL",
     parameters=[
         ('node_cls', type, field(default=nb.TLLNode)),
+        ('use_m_of_n', bool, field(default=False)),
+        ('max_tree_size', int, field(default=20)),
+        ('min_samples', int, field(default=100)),
+        ('dist_test_alpha', float, field(default=0.05))
+    ],
+    fitter=fit_with_data_and_oracle,
+    node_building=nb.OGCferNodeBuilderMixin,
+    split_candidate_generator=make_split_candidates_p,
+    split_score=ijcai19_lr_gradient_slow,
+    data_generator=trepan_generator,
+    queue=Heap,
+    global_stop=tree_size_limit,
+    local_stop=never,
+    use_proba=True,
+    splits_composer=compose_split_constructor_mk2
+)
+
+# Trepan with logistic regression leaves and a 1-d estimator
+TLL3 = greedy_binary_classification_tree_learner(
+        name="TLL",
+    parameters=[
+        ('node_cls', type, field(default=nb.BTLLNode)),
         ('use_m_of_n', bool, field(default=False)),
         ('max_tree_size', int, field(default=20)),
         ('min_samples', int, field(default=100)),

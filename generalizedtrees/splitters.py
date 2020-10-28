@@ -100,7 +100,11 @@ def ijcai19_lr_gradient_slow(node, split):
 
     # LR loss (unregularized) gradient is easy to compute from data, targets, and prediction:
     y = node.target_proba[:,[1]]
-    y_hat = node.model.estimate(node.data)[:,[1]]
+    node_est = node.model.estimate(node.data)
+    if len(node_est.shape) == 2:
+        y_hat = node_est[:,[1]]
+    else:
+        y_hat = node_est.reshape(-1, 1)
     gradients = (y_hat - y) * y_hat * (1 - y_hat) * x
 
     # This is eq. 6 in the paper

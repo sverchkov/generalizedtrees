@@ -106,6 +106,9 @@ class TreeBinaryClassifierMixin(BaseTreeClassifierMixin):
 
     def predict_proba(self, data_matrix, as_dataframe=False):
 
+        if isinstance(data_matrix, DataFrame):
+            data_matrix = data_matrix.to_numpy()
+        
         p_1 = estimate(self.tree, data_matrix, 1)
         proba = np.concatenate((1 - p_1, p_1), axis=1)
 

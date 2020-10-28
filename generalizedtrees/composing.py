@@ -17,7 +17,7 @@
 from typing import Type, Any, Callable
 from dataclasses import make_dataclass
 from generalizedtrees.base import GreedyTreeBuilder, CanPushPop
-from generalizedtrees.predict import TreeClassifierMixin
+from generalizedtrees.predict import TreeClassifierMixin, TreeBinaryClassifierMixin
 from generalizedtrees.tree import tree_to_str
 from logging import getLogger
 
@@ -113,6 +113,44 @@ def greedy_classification_tree_learner(
     **kwargs):
 
     bases = (node_building, TreeClassifierMixin, GreedyTreeBuilder)
+
+    use_proba = kwargs.get('use_proba', False)
+    splits_composer = kwargs.get('splits_composer', compose_sample_based_split_constructor)
+
+    members = dict(
+        fit=fitter,
+        new_queue=queue,
+        construct_split=splits_composer(
+            split_candidate_generator,
+            split_score,
+            use_proba),
+        global_stop=global_stop,
+        local_stop=local_stop,
+        show_tree=show_tree
+    )
+
+    if data_generator is not None:
+        members.update(dict(new_generator=data_generator))
+
+    return make_dataclass(name, fields=parameters, bases=bases, namespace=members)
+
+
+# Version for binary trees where the underlying estimator has a scalar target
+    
+def greedy_binary_classification_tree_learner(
+    name: str,
+    parameters, # As in dataclass
+    fitter: Callable, # Fit function
+    node_building: Type[Any], # Mixin class
+    split_candidate_generator: Callable, # Function (feature spec, data, targets)
+    split_score: Callable, # Function (split, data, targets)
+    queue: Type[CanPushPop], # Queue class
+    global_stop: Callable, # function of model
+    local_stop: Callable, # function of model, node
+    data_generator = None, # Function, optional. Takes training data and outputs f(constraints, n) -> data
+    **kwargs):
+
+    bases = (node_building, TreeBinaryClassifierMixin, GreedyTreeBuilder)
 
     use_proba = kwargs.get('use_proba', False)
     splits_composer = kwargs.get('splits_composer', compose_sample_based_split_constructor)

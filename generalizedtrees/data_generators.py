@@ -15,13 +15,58 @@
 # limitations under the License.
 
 from generalizedtrees.features import FeatureSpec
-from collections import namedtuple
 import numpy as np
-import pandas as pd
+
+
+#####################
+# Trepan's approach #
+#####################
+
+
+def trepan_generator_n(tree_model, training_data: np.ndarray):
+    """
+    The data generation scheme used in Trepan
+
+    n-sample version
+    """
+
+    d = training_data.shape[1]
+
+    # The Trepan generator independently generates the individual feature values.
+    feature_generators = [
+        _n_feature_generator(training_data[:,i], tree_model.feature_spec[i])
+        for i in range(d)]
+
+    return lambda n: np.array([f(n) for f in feature_generators])
+
+
+def _n_feature_generator(data_vector, feature: FeatureSpec, rng=np.random.default_rng()):
+
+    n = len(data_vector)
+
+    if feature is FeatureSpec.CONTINUOUS:
+        # Sample from a KDE.
+        # We use Generator and not RandomState but KDE implementations use RandomState
+        # so it's more reliable to just implement the sampling here. 
+        return lambda m: rng.normal(
+            loc = rng.choice(data_vector, size=m),
+            scale = 1/np.sqrt(n),
+            size = m)[0]
+
+    elif feature & FeatureSpec.DISCRETE:
+        # Sample from the empirical distribution
+        values, counts = np.unique(data_vector, return_counts=True)
+        return lambda m: rng.choice(values, p=counts/n, size=m)
+    
+    else:
+        raise ValueError(f"I don't know how to handle feature spec {feature}")
+
 
 def trepan_generator(tree_model, training_data: np.ndarray):
     """
     The data generation scheme used in Trepan
+
+    1-sample version
     """
 
     d = training_data.shape[1]
@@ -53,6 +98,11 @@ def _feature_generator(data_vector, feature: FeatureSpec, rng=np.random.default_
     
     else:
         raise ValueError(f"I don't know how to handle feature spec {feature}")
+
+
+############
+# Smearing #
+############
 
 def smearing(tree_model, training_data: np.ndarray):
     r"""
