@@ -60,7 +60,12 @@ def _get_constraint_type_as_html_string(constraint):
 
 
 def explanation_to_JSON(explanation, feature_annotations = None):
-    return json.dumps(explanation_to_simplified(explanation, feature_annotations))
+    simplified = explanation_to_simplified(explanation, feature_annotations)
+    try:
+        return json.dumps(simplified)
+    except:
+        logger.debug(f'Simplified model: {simplified}')
+        raise
 
 
 def explanation_to_simplified(explanation, feature_annotations = None):
