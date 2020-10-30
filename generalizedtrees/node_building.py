@@ -600,7 +600,8 @@ class BTLLNode:
             LogisticRegression(
                 penalty='l1',
                 C=0.1,
-                solver='saga')
+                solver='saga',
+                max_iter=5000)
         )
 
         return est.fit(self.data, targets)
