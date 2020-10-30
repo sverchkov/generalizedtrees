@@ -82,12 +82,12 @@ def explanation_to_simplified(explanation, feature_annotations = None):
         # Record training set counts (and target distributions)
         if hasattr(in_node.item, 'training_target_proba'):
             out_node['training_samples'] = [
-                {'label':k, 'count': v} for k, v in
+                {'label':str(k), 'count': int(v)} for k, v in
                 zip(in_node.item.training_target_proba.sum(axis=0), explanation.classes_)]
 
         if hasattr(in_node.item, 'gen_target_proba'):
             out_node['generated_samples'] = [
-                {'label': k, 'count': v} for k, v in
+                {'label': str(k), 'count': int(v)} for k, v in
                 zip(in_node.item.training_target_proba.sum(axis=0), explanation.classes_)]
 
         # Record split
@@ -100,7 +100,7 @@ def explanation_to_simplified(explanation, feature_annotations = None):
                     annotation = feature_annotations.loc[f]
                     out_node['feature_annotation'] = [{'annotation': 'feature id', 'value': f}]
                     out_node['feature_annotation'].extend([
-                        {'annotation': i, 'value': v} for i, v in annotation.iteritems()])
+                        {'annotation': str(i), 'value': v} for i, v in annotation.iteritems()])
                 
                 except Exception as e:
                     logger.warning(

@@ -57,7 +57,7 @@ def _constant_estimator_to_simplified(model: ConstantEstimator, explanation):
 
     return {'estimate': [
         {
-            'label_id': i,
+            'label_id': int(i),
             'label': _ensure_native(explanation.classes_[i]),
             'value': _ensure_native(est_vector[i])}
         for i in range(len(explanation.classes_))]}
@@ -73,7 +73,7 @@ def _skl_linear_estimator_to_simplified(model: SKProbaEstimator, explanation, ep
                 {
                     'label': _ensure_native(explanation.feature_names[i]),
                     'value': _ensure_native(cfer.coef_.flat[i]),
-                    'feature_id': i
+                    'feature_id': int(i)
                 }
                 for i in range(len(cfer.coef_))
                 if abs(cfer.coef_.flat[i]) > epsilon]
