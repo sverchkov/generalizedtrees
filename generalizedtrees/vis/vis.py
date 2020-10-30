@@ -88,7 +88,7 @@ def explanation_to_simplified(explanation, feature_annotations = None):
         if hasattr(in_node.item, 'gen_target_proba'):
             out_node['generated_samples'] = [
                 {'label': str(k), 'count': int(v)} for v, k in
-                zip(in_node.item.training_target_proba.sum(axis=0), explanation.classes_)]
+                zip(in_node.item.gen_target_proba.sum(axis=0), explanation.classes_)]
 
         # Record split
         if hasattr(in_node.item, 'split') and in_node.item.split is not None:

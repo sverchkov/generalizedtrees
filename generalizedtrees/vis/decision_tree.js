@@ -219,7 +219,7 @@ function fillPNodes(nodeSelection, legend){
     slices = nodeSelection.selectAll("path")
         .data(d => pie(d.data.model.estimate))
         .join("path")
-        .attr("fill", d => color(d.data.model.estimate.label))
+        .attr("fill", d => color(d.data.label))
         .attr("stroke-width", "0.5")
         .attr("stroke", "white")
         .attr("d", arc)
@@ -268,7 +268,7 @@ function fillLRNodes(nodeSelection){
     let max_v = 0;
 
     nodeSelection.data().forEach(function(d){
-        d.data.logistic_model.forEach(function(v){
+        d.data.model.coefficients.forEach(function(v){
             if (v.value < min_v) min_v = v.value;
             if (v.value > max_v) max_v = v.value;
         })
