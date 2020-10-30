@@ -183,9 +183,9 @@ function fillNodes(nodeSelection, legend){
 
     fillSplitNodes(nodeSelection.filter(d => !!d.children))
     
-    fillPNodes(nodeSelection.filter(d => !d.children && d.data.probabilities), legend)
+    fillPNodes(nodeSelection.filter(d => !d.children && d.data.model.estimate), legend)
 
-    fillLRNodes(nodeSelection.filter(d => !d.children && d.data.logistic_model))
+    fillLRNodes(nodeSelection.filter(d => !d.children && d.data.model.coefficients))
 }
 
 // Draws split nodes
@@ -208,7 +208,7 @@ function fillPNodes(nodeSelection, legend){
     // Create scale on which targets are listed
     const targets = new Set();
     nodeSelection.data().forEach(d =>
-        d.data.probabilities.forEach(v => targets.add(v.target)))
+        d.data.model.estimate.forEach(v => targets.add(v.label)))
     const color = d3.scaleOrdinal().domain(targets).range(d3.schemeCategory10)
 
     // Helpers
@@ -217,9 +217,9 @@ function fillPNodes(nodeSelection, legend){
 
     // Draw pie charts
     slices = nodeSelection.selectAll("path")
-        .data(d => pie(d.data.probabilities))
+        .data(d => pie(d.data.model.estimate))
         .join("path")
-        .attr("fill", d => color(d.data.target))
+        .attr("fill", d => color(d.data.model.estimate.label))
         .attr("stroke-width", "0.5")
         .attr("stroke", "white")
         .attr("d", arc)
@@ -278,7 +278,7 @@ function fillLRNodes(nodeSelection){
     const bars_xshift = 0 - (max_v + min_v) / 2;
     
     bars = nodeSelection.selectAll("g")
-        .data(d => d.data.logistic_model)
+        .data(d => d.data.model.coefficients)
         .join("g")
         .attr("transform", function(d,i){
             return `translate(${bars_xshift},${i * r_height})`;
