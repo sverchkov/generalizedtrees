@@ -1,4 +1,4 @@
-# Fitting functions (for use in tree composition)
+# Givens learner components
 #
 # Copyright 2020 Yuriy Sverchkov
 #
@@ -14,11 +14,70 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
-from generalizedtrees.base import AbstractTreeBuilder
+from abc import abstractmethod
+from typing import Callable, Optional, Tuple, Protocol
 from generalizedtrees.features import FeatureSpec, infer_feature_spec
 import pandas as pd
 import numpy as np
+
+# Givens Learner Component:
+
+# Interface definition
+class GivensLC(Protocol):
+    """
+    Givens Learner Component (LC)
+
+    The givens learner component is used during fitting to process the inputs to the fit function
+    and provide a standardized interface for acessing the 'givens', e.g. training data, oracle
+    """
+
+    feature_names: np.ndarray
+    feature_spec: Tuple[FeatureSpec]
+    target_names: np.ndarray
+    data_matrix: np.ndarray
+    target_matrix: np.ndarray
+
+    @abstractmethod
+    def process(self, *args, **kwargs) -> None:
+        raise NotImplementedError
+
+
+# For supervised data
+class SupervisedDataGivensLC(GivensLC):
+    """
+    Givens LC for the standard supervised learning setting
+    """
+
+    #data_transform: Optional[Callable] = None # Maybe in the future
+    transform_targets: Optional[Callable] = None
+
+    def process(self, data, targets, *args, **kwargs) -> None:
+        
+        # Infer target_names if not given
+        if 'target_names' not in kwargs:
+            self.target_names = np.unique(targets)
+        k = len(self.target_names)
+
+        # Parse data and populate tree_builder
+        self.data_matrix, self.feature_names, self.feature_spec = parse_data(
+            data,
+            feature_names=kwargs.get('feature_names'),
+            feature_spec=kwargs.get('feature_spec')
+        )
+        
+        if not isinstance(targets, np.ndarray):
+            targets = np.array(targets)
+
+        if self.transform_targets is not None:
+            targets = self.transform_targets(targets)
+
+        self.target_matrix = targets
+
+
+# For unlabeled features + oracle
+
+
+# Helpers
 
 def parse_data(data, feature_names=None, feature_spec=None):
 
@@ -63,36 +122,6 @@ def parse_data(data, feature_names=None, feature_spec=None):
 
     return (data_matrix, feature_names, feature_spec)
 
-
-def supervised_data_fit(tree_builder: AbstractTreeBuilder, data, targets, **kwargs):
-
-    # So far just blindly accepting kwargs. A little hacky.
-    tree_builder.__dict__.update(kwargs)
-
-    # Infer classes_ if not given
-    if not hasattr(tree_builder, 'classes_'):
-        tree_builder.classes_ = np.unique(targets)
-    k = len(tree_builder.classes_)
-
-    # Parse data and populate tree_builder
-    tree_builder.data, tree_builder.feature_names, tree_builder.feature_spec = parse_data(
-        data,
-        feature_names=getattr(tree_builder, 'feature_names', None),
-        feature_spec=getattr(tree_builder, 'feature_spec', None)
-    )
-    
-    if not isinstance(targets, np.ndarray):
-        targets = np.array(targets)
-    targets = targets.flatten()
-
-    tree_builder.targets = np.zeros((len(targets), k))
-    for i in range(k):
-        tree_builder.targets[targets == tree_builder.classes_[i], i] = 1.0
-    
-    tree_builder.tree = tree_builder.build_tree()
-    tree_builder.tree = tree_builder.prune_tree(tree_builder.tree)
-
-    return tree_builder
 
 def fit_with_data_and_oracle(
     tree_builder: AbstractTreeBuilder,

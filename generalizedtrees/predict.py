@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from abc import abstractmethod
+from typing import Protocol
+
 import numpy as np
 from pandas import DataFrame
 
@@ -56,74 +59,97 @@ def estimate(tree: Tree, data_matrix, target_dimension):
             dtype=np.float))
 
 
-class BaseTreeClassifierMixin:
+# Predictor Learner Component:
 
-    # Base class for tree classifiers, defining predict as a function of predict_proba
+# Interface definition
+class PredictorLC(Protocol):
+    """
+    Predictor Learner Component (LC)
 
-    # Required members:
-    # self.tree (Tree)
-    # self.classes_ (A numpy array of class labels)
+    The predictor learner component computes a prediction for data given a learned tree.
+    It correctly routes (and if needed transforms) the estimates obtained from the leaf estimators
+    to outputs of the predict and predict_proba methods.
 
-    def predict(self, data_matrix, as_labels=True):
+    It is assumed that set_target_names will be called to help determine the output shape before
+    prediction is attempted. Typically, set_target_names will be called during fitting.
+    """
 
-        proba = self.predict_proba(data_matrix)
+    @abstractmethod
+    def set_target_names(self, target_names: np.ndarray) -> None:
+        raise NotImplementedError
+
+    def predict(self, tree: Tree, data_matrix: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+    def predict_proba(self, tree: Tree, data_matrix: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+# Regressors
+class RegressorLC(PredictorLC):
+    """
+    Regressor learner component
+
+    Passes estimates from tree directly through the predict method.
+    Watches the target_names attribute to get output dimension.
+    """
+
+    target_dim: int
+
+    def set_target_names(self, target_names: np.ndarray) -> None:
+        self.target_dim = len(target_names)
+
+    def predict(self, tree: Tree, data_matrix: np.ndarray):
+        return estimate(tree, data_matrix, self.target_dim)
+
+# Classifiers
+
+# Base for classifiers
+class BaseClassifierLC(PredictorLC):
+    """
+    Base class for classifier LCs
+    
+    Defines set_target_names
+    Defines predict as a function of predict_proba
+    """
+
+    target_names: np.ndarray
+
+    def set_target_names(self, target_names: np.ndarray) -> None:
+        self.target_names = target_names
+
+    def predict(self, tree: Tree, data_matrix: np.ndarray):
+
+        proba = self.predict_proba(tree, data_matrix)
         max_idx = proba.argmax(axis=1)
+        return self.target_names[max_idx]
 
-        if as_labels:
-            return self.classes_[max_idx]
-        else:
-            return max_idx
+# Direct classifiers: each dimension of the estimator matches the probability of a target class
+class ClassifierLC(BaseClassifierLC):
+    """
+    Classifier LC
 
+    Each dimension of the underlying estimator matches the probability of a target class
+    """
 
-class TreeClassifierMixin(BaseTreeClassifierMixin):
-
-    # Required members:
-    # self.tree (Tree)
-    # self.classes_ (A numpy array of class labels)
-
-    def predict_proba(self, data_matrix, as_dataframe=False):
-
-        if isinstance(data_matrix, DataFrame):
-            data_matrix = data_matrix.to_numpy()
+    def predict_proba(self, tree: Tree, data_matrix: np.ndarray):
 
         proba = estimate(self.tree, data_matrix, len(self.classes_))
 
-        if as_dataframe:
-            return DataFrame(proba, columns=self.classes_)
-        else:
-            return proba
+        return proba
 
 
-class TreeBinaryClassifierMixin(BaseTreeClassifierMixin):
+class TreeBinaryClassifierMixin(BaseClassifierLC):
+    """
+    Binary Classifier LC
 
-    # The binary classifier is different from the classifier in that the
-    # underlying estimator is 1-dimensional, with the estimate reflecting
-    # the probability of the +ve (second) class
+    The binary classifier is different from the direct classifier in that the
+    underlying estimator is assumed to be 1-dimensional, with the estimate reflecting
+    the probability of the +ve (second) class
+    """
 
-    # Required members:
-    # self.tree (Tree)
-    # self.classes_ (A numpy array of class labels)
+    def predict_proba(self, tree: Tree, data_matrix: np.ndarray):
 
-    def predict_proba(self, data_matrix, as_dataframe=False):
-
-        if isinstance(data_matrix, DataFrame):
-            data_matrix = data_matrix.to_numpy()
-        
         p_1 = estimate(self.tree, data_matrix, 1)
         proba = np.concatenate((1 - p_1, p_1), axis=1)
 
-        if as_dataframe:
-            return DataFrame(proba, columns=self.classes_)
-        else:
-            return proba
-
-
-class TreeRegressorMixin:
-
-    # Required members:
-    # self.tree (Tree)
-    # self.target_dim (dimension of target vector)
-    # TODO: flattening of 1-d target?
-
-    def predict(self, data_matrix):
-        return estimate(self.tree, data_matrix, self.target_dim)
+        return proba
