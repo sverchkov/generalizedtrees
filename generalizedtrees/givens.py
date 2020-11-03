@@ -16,6 +16,7 @@
 
 from abc import abstractmethod
 from typing import Callable, Optional, Tuple, Protocol
+
 from generalizedtrees.features import FeatureSpec, infer_feature_spec
 import pandas as pd
 import numpy as np
@@ -31,11 +32,13 @@ class GivensLC(Protocol):
     and provide a standardized interface for acessing the 'givens', e.g. training data, oracle
     """
 
+    # "Output" properties
     feature_names: np.ndarray
     feature_spec: Tuple[FeatureSpec]
-    target_names: np.ndarray
+    target_names: Optional[np.ndarray] = None
     data_matrix: np.ndarray
-    target_matrix: np.ndarray
+    target_matrix: Optional[np.ndarray] = None
+    oracle: Optional[Callable[..., np.ndarray]] = None
 
     @abstractmethod
     def process(self, *args, **kwargs) -> None:
@@ -48,17 +51,39 @@ class SupervisedDataGivensLC(GivensLC):
     Givens LC for the standard supervised learning setting
     """
 
-    #data_transform: Optional[Callable] = None # Maybe in the future
-    transform_targets: Optional[Callable] = None
+    def process(
+        self,
+        data,
+        targets,
+        *args,
+        target_names = None,
+        target_shape = None,
+        **kwargs) -> None:
+        """
+        Processing input for standard supervised learning:
 
-    def process(self, data, targets, *args, **kwargs) -> None:
+        :param: data - the n-by-d feature matrix
+        :param: targets - either a vector of target values of length n or an n-by-k matrix
+        :param: target_shape - a hint to which shape the targets take: 'label_vector' for
+            a vector of length n where values correspond to class labels, or 'matrix' for
+            an n-by-k matrix. If None, then this is inferred from the dimensionality of targets.
+        """
+
+        if target_names is not None:
+            self.target_names = target_names
+
+        if target_shape is None:
+            target_shape = 'matrix' if len(targets.shape) == 2 else 'label_vector'
         
         # Infer target_names if not given
-        if 'target_names' not in kwargs:
-            self.target_names = np.unique(targets)
-        k = len(self.target_names)
+        if self.target_names is not None:
+            if target_shape == 'label_vector':
+                self.target_names = np.unique(targets)
+            else:
+                # Assume matrix with 1 column per target
+                self.target_names = getattr(targets, 'columns', np.arange(targets.shape[1]))
 
-        # Parse data and populate tree_builder
+        # Parse data
         self.data_matrix, self.feature_names, self.feature_spec = parse_data(
             data,
             feature_names=kwargs.get('feature_names'),
@@ -68,13 +93,46 @@ class SupervisedDataGivensLC(GivensLC):
         if not isinstance(targets, np.ndarray):
             targets = np.array(targets)
 
-        if self.transform_targets is not None:
-            targets = self.transform_targets(targets)
-
-        self.target_matrix = targets
+        # Reshape targets to matrix form
+        if target_shape == 'label_vector':
+            # This does 1-hot encoding
+            self.target_matrix = np.array([x == self.target_names for x in targets], dtype=float)
+        else:
+            self.target_matrix = targets
 
 
 # For unlabeled features + oracle
+class DataWithOracleGivensLC(GivensLC):
+    """
+    Given LC for the usual explanation setting, where we have unlabeled training data and
+    a predictor oracle.
+    """
+
+    def process(self, data, oracle, *args, target_names=None, prelabel_data=True, **kwargs):
+
+        if target_names is not None:
+            self.target_names = target_names
+
+        # Parse data
+        self.data_matrix, self.feature_names, self.feature_spec = parse_data(
+            data,
+            feature_names=kwargs.get('feature_names'),
+            feature_spec=kwargs.get('feature_spec')
+        )
+
+        # Todo: some sort of validation
+        self.oracle = oracle
+
+        if prelabel_data:
+            targets = oracle(self.data_matrix)
+
+            # Infer target_names if not given
+            if self.target_names is not None:
+                # Assume that oracle yields matrix
+                self.target_names = getattr(targets, 'columns', np.arange(targets.shape[1]))
+            
+            # Assume that oracle yields matrix
+            self.target_matrix = targets if isinstance(targets, np.ndarray) else targets.to_numpy()
 
 
 # Helpers
@@ -115,6 +173,8 @@ def parse_data(data, feature_names=None, feature_spec=None):
 
     if isinstance(data, np.ndarray):
         data_matrix = data
+    else:
+        raise ValueError(f'Could not process a {type(data)} object: {data}')
 
     
     if feature_spec is None:
@@ -122,59 +182,3 @@ def parse_data(data, feature_names=None, feature_spec=None):
 
     return (data_matrix, feature_names, feature_spec)
 
-
-def fit_with_data_and_oracle(
-    tree_builder: AbstractTreeBuilder,
-    data,
-    oracle,
-    #oracle_gives_probabilities: bool = False, #TODO: Figure out need and scope
-    #max_tree_size: Optional[int] = None, #TODO: Set in parameters/kwargs
-    **kwargs):
-
-    # So far just blindly accepting kwargs. A little hacky.
-    tree_builder.__dict__.update(kwargs)
-
-    # Parse data and populate tree_builder
-    tree_builder.data, tree_builder.feature_names, tree_builder.feature_spec = parse_data(
-        data,
-        feature_names=getattr(tree_builder, 'feature_names', None),
-        feature_spec=getattr(tree_builder, 'feature_spec', None)
-    )
-
-    # Do we use _d?
-    _, tree_builder._d = np.shape(tree_builder.data)
-
-    tree_builder.oracle = oracle
-
-    tree_builder.oracle_gives_probabilities = getattr(tree_builder, 'oracle_gives_probabilities', True)
-
-    # Targets of training data
-    if tree_builder.oracle_gives_probabilities:
-        target_proba = tree_builder.oracle(tree_builder.data)
-        if isinstance(target_proba, pd.DataFrame):
-            tree_builder.targets = target_proba.to_numpy()
-            inferred_classes = target_proba.columns.to_numpy()
-        else:
-            # Add checks to verify shape/numpy-ness
-            tree_builder.targets = target_proba
-            inferred_classes = np.arange(target_proba.shape[1])
-        
-        tree_builder.classes_ = getattr(tree_builder, "classes_", inferred_classes)
-
-    else:
-        targets = tree_builder.oracle(tree_builder.data)
-        if isinstance(targets, pd.Series):
-            targets = targets.to_numpy()
-
-        tree_builder.classes_ = getattr(tree_builder, "classes_", np.unique(targets))
-
-        k = len(tree_builder.classes_)
-        tree_builder.targets = np.zeros((len(targets), k))
-        for i in range(k):
-            tree_builder.targets[targets == tree_builder.classes_[i], i] = 1.0
-
-    # Build the tree
-    tree_builder.tree = tree_builder.build_tree()
-    tree_builder.tree = tree_builder.prune_tree(tree_builder.tree)
-
-    return tree_builder

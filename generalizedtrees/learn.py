@@ -14,41 +14,73 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from generalizedtrees.stop import GlobalStopLC, LocalStopLC, NeverStopLC
+from generalizedtrees.queues import CanPushPop
+from typing import Callable
 import numpy as np
 from pandas import DataFrame
 
 from generalizedtrees.tree import Tree
 from generalizedtrees.predict import PredictorLC
 from generalizedtrees.givens import GivensLC
+from generalizedtrees.grow import GreedyBuilderLC
 
 class GreedyTreeLearner:
 
     # Internals
     tree: Tree
-    target_names: np.ndarray
 
     # Learner components
     givens: GivensLC
+    builder: GreedyBuilderLC = GreedyBuilderLC()
     predictor: PredictorLC
-
-    # TODO
+    
+    # TODO?
     #def __init__(self, *args, **kwargs):
         # TODO: Validation
         # TODO: Set components from input
 
-    # TODO: Individual component setters
+    # Component setters for components that aren't direct attributes
+
+    @property
+    def local_stop(self) -> LocalStopLC:
+        return self.builder.local_stop
+    
+    @local_stop.setter
+    def local_stop(self, value: LocalStopLC) -> None:
+        self.builder.local_stop = value
+    
+    @property
+    def global_stop(self) -> GlobalStopLC:
+        return self.builder.global_stop
+    
+    @global_stop.setter
+    def global_stop(self, value: GlobalStopLC):
+        self.builder.global_stop = value
+
+    def set_queue(self, queue = Callable[..., CanPushPop]):
+        self.builder.new_queue = queue
+
+    # Setting individual components after initialization shoud use python property/attribute setting syntax
+    queue = property(None, set_queue)
 
     def fit(self, *args, **kwargs):
         
         # TODO: Check for things in kwargs that set other component parameters
 
+        # TODO: Check that required things are set
+
         # Process givens
         self.givens.process(*args, **kwargs)
         
+        # Set components
         self.predictor.set_target_names(self.givens.target_names)
 
         # Build tree
+        self.tree = self.builder.build_tree()
+
         # Prune tree
+        self.tree = self.builder.prune_tree(self.tree)
 
         return self
     
