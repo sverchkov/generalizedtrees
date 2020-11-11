@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from abc import abstractmethod
 from logging import getLogger
 from typing import Iterable, Protocol, Tuple, Optional
 from functools import cached_property
@@ -24,10 +25,13 @@ import numpy as np
 from generalizedtrees.base import SplitTest
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.constraints import LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
+from generalizedtrees import scores
 
 logger = getLogger()
 
-# Split classes
+#################
+# Split classes #
+#################
 
 class SplitGT(SplitTest):
 
@@ -109,7 +113,10 @@ class SplitEveryValue(SplitTest):
         return f'Test {feature} against each of {self.values}'
 
 
-# Base split generating functions
+###################################
+# Base split generating functions #
+###################################
+
 
 def fayyad_thresholds(feature_vector, feature_index, target_matrix):
     """
@@ -168,13 +175,18 @@ def all_values_split(feature, values):
     yield SplitEveryValue(feature, values)
 
 
-# Split Candidate Generators
+##############################
+# Split Candidate Generators #
+##############################
+
 
 # Interface definition
 class SplitCandidateGeneratorLC(Protocol):
 
+    @abstractmethod
     def genenerator(self, data: np.ndarray, y: np.ndarray) -> Iterable[SplitTest]:
         raise NotImplementedError
+
 
 # Default implementation for single-feature axis-aligned splits:
 class AxisAlignedSplitGeneratorLC(SplitCandidateGeneratorLC):
@@ -190,14 +202,149 @@ class AxisAlignedSplitGeneratorLC(SplitCandidateGeneratorLC):
                 yield from one_vs_all(data[:, j], j)
             else:
                 raise ValueError(f"I don't know how to handle feature spec {self.feature_spec[j]}")
+
+
+####################################
+# Split Scorers Learning Component #
+####################################
+
+# Interface definition:
+# We could maybe define this as a callable instead?
+class SplitScoreLC(Protocol):
+
+    @abstractmethod
+    def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
+        raise NotImplementedError
+
+
+# Implementations
+
+class DiscreteInformationGainLC(SplitScoreLC):
+
+    def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
+        branches = split.pick_branches(data)
+        return scores.entropy(y) - sum(map(
+            lambda b: scores.entropy(y[branches == b]),
+            np.unique(branches)))
+
+
+class ProbabilityInformationGainLC(SplitScoreLC):
+
+    def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
         
-# Split Generator Learner Component
+        branches = split.pick_branches(data)
+
+        return scores.entropy_of_p_matrix(y) - sum(map(
+            lambda b: scores.entropy_of_p_matrix(y[branches==b, :]),
+            np.unique(branches)
+        ))
+
+
+class IJCAI19LRGradientScoreLC(SplitScoreLC):
+    """
+    Gradient-based split score for logistic regression model trees.
+
+    A slow implementation of the criterion described in Broelemann and Kasneci 2019 (IJCAI)
+    Assumes that the model at the node is an sk-learn binary logistic regression.
+    """
+
+    def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
+
+        branches = split.pick_branches(data)
+
+        x = np.concatenate([np.ones((data.shape[0], 1)), data], axis=1)
+
+        # LR loss (unregularized) gradient is easy to compute from data, targets, and prediction:
+        y = y[:,[1]]
+        node_est = node.model.estimate(data)
+        if node_est.shape[1] == 2:
+            y_hat = node_est[:,[1]]
+        else:
+            y_hat = node_est
+        gradients = (y_hat - y) * y_hat * (1 - y_hat) * x
+
+        # This is eq. 6 in the paper
+        ssg = (gradients**2).sum(axis=1)
+        return sum(map(lambda b: ssg[branches == b].mean(), np.unique(branches)))
+
+
+class AUROCSplitScoreLC(SplitScoreLC):
+    """
+    Compute a criterion based on area under an ROC curve.
+
+    Adapted from the AUCsplit criterion (Ferri et al. ICML 2002) for target probability matrices.
+    PDF at: http://staff.icar.cnr.it/manco/Teaching/2006/datamining/articoli/105.pdf
+    """
+
+    def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
+
+        n_s, n_t = y.shape
+
+        thresholds = np.unique(y[:, 1], return_index = True)
+        
+        if n_t != 2:
+            raise ValueError("The auroc criterion is only available for binary classification")
+
+        k = len(split.constraints)
+
+        branches = split.pick_branches(data)
+
+        best_auroc = 0
+
+        for t in thresholds:
+            positives = y[:,1] >= t
+            negatives = np.logical_not(positives)
+            
+            branches_onehot = np.eye(k)[branches]
+            branch_pos = positives * branches_onehot
+            branch_neg = negatives * branches_onehot
+
+            branch_pos_count = np.sum(branch_pos, axis=0)
+            branch_neg_count = np.sum(branch_neg, axis=0)
+            branch_count = np.sum(branches_onehot)
+
+            # "Local predictive accuracy"
+            if branch_pos_count == branch_neg_count: # Catches 0-sample branches
+                branch_lpa = 0.5
+            else:
+                branch_lpa = branch_pos_count / (branch_pos_count + branch_neg_count)
+            
+            # Identify branches that have more negatives than positives, update lpa
+            neg_branches = branch_lpa < 0.5
+            if any(neg_branches):
+                branch_lpa[neg_branches] = 1 - branch_lpa[neg_branches]
+                branch_pos_count[neg_branches] = branch_neg_count[neg_branches]
+                branch_neg_count[neg_branches] = branch_count[neg_branches] - branch_pos_count[neg_branches]
+            
+            branch_order = np.argsort(branch_lpa)
+
+            auroc = 0
+            # Using notation from the paper:
+            x_t = sum(negatives)
+            y_t = sum(positives)
+            y_im1 = 0
+
+            for i in branch_order:
+                auroc += branch_neg_count[i] / x_t * (2 * y_im1 + branch_pos_count[i]) / (2 * y_t)
+                y_im1 += branch_pos_count[i]
+
+            if auroc > best_auroc:
+                best_auroc = auroc
+
+        return best_auroc
+
+
+#####################################
+# Split Generator Learner Component #
+#####################################
 
 # Future: define protocol if we ever need to define multiple ways to do this
+
 
 class SplitConstructorLC:
 
     split_generator: SplitCandidateGeneratorLC
+    split_scorer: SplitScoreLC
 
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
 
@@ -205,20 +352,15 @@ class SplitConstructorLC:
             data = node.data
         
         if y is None:
-            y = node.model.estimate(data)
+            y = node.y
         
         best_split = None
         best_split_score = 0
         for split in self.split_generator.genenerator(data, y):
-            new_score = self.score_split(node, split)
+            new_score = self.split_scorer.score(split, node, data, y)
             if new_score > best_split_score:
                 best_split_score = new_score
                 best_split = split
 
         return best_split
-
-    def score_split(self, node, split: SplitTest) -> float:
-
-        # TODO: check what generalizes across existing implementations
-        raise NotImplementedError
 
