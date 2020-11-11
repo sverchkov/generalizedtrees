@@ -34,148 +34,14 @@ def get_column(data, feature):
     else:
         return data[:, feature]
 
-# Split classes
-
-class SplitGT(SplitTest):
-
-    def __init__(self, feature, value, feature_name=None):
-        self.feature_name = feature_name
-        self.feature = feature
-        self.value = value
-    
-    def pick_branches(self, data_matrix):
-        try:
-            v = get_column(data_matrix, self.feature)
-            return (v > self.value).astype(np.intp)
-        except:
-            logger.fatal(
-                'Something went wrong.\n'
-                f'Feature: {self.feature}, Value: {self.value}\n'
-                f'Matrix:\n{data_matrix}\n'
-                f'Column returned:\n{v}')
-            raise
-
-    @cached_property
-    def constraints(self):
-        return (
-            LEQConstraint(self.feature, self.value),
-            GTConstraint(self.feature, self.value))
-    
-    def __str__(self):
-        if self.feature_name is None:
-            feature = f'x[{self.feature}]'
-        else:
-            feature = self.feature_name
-        return f'Test {feature} > {self.value}'
-
-
-class SplitOneVsAll(SplitTest):
-
-    def __init__(self, feature, value, feature_name=None):
-        self.feature_name = feature_name
-        self.feature = feature
-        self.value = value
-    
-    def pick_branches(self, data_matrix):
-        return (get_column(data_matrix, self.feature) == self.value).astype(np.intp)
-
-    @cached_property
-    def constraints(self):
-        return (
-            NEQConstraint(self.feature, self.value),
-            EQConstraint(self.feature, self.value))
-
-    def __str__(self):
-        if self.feature_name is None:
-            feature = f'x[{self.feature}]'
-        else:
-            feature = self.feature_name
-        return f'Test {feature} == {self.value}'
-
-
-class SplitEveryValue(SplitTest):
-
-    def __init__(self, feature, values, feature_name=None):
-        self.feature_name = feature_name
-        self.feature = feature
-        self.values = values
-        self.map = {values[i]: i for i in range(len(values))}
-    
-    def pick_branches(self, data_matrix):
-        return get_column(data_matrix, self.feature).map(self.map)
-
-    @cached_property
-    def constraints(self):
-        return (EQConstraint(self.feature, v) for v in self.values)
-
-    def __str__(self):
-        if self.feature_name is None:
-            feature = f'x[{self.feature}]'
-        else:
-            feature = self.feature_name
-        return f'Test {feature} against each of {self.values}'
 
 
 # Test generators
 
-def fayyad_thresholds(data, target, feature):
-    """
-    Generator of splits for numeric (or more generally orderable) values.
-
-    We only generate splits between distinctly labeled distinct adjacent values.
-    Fayyad and Irani (1992) prove that such splits are always better (in terms of entropy) than
-    splits between adjacent equally labeled values.
-
-    :param data: Input data matrix, n-by-d
-    :param target: Target value matrix, n-by-k
-    :param feature: Index of splitting feature (integer >=0 and <d)
-    """
-    v = sorted(zip(data[:,feature], target), key=itemgetter(0))
-    
-    # Flag for handling the case when two identical x-values have distinct y-values
-    x_collision = False
-
-    for j in range(1, len(v), 1):
-        x_prev, y_prev = v[j-1]
-        x, y = v[j]
-
-        # Only place splits between distinct x-values
-        if x_prev < x:
-            # Only place splits between distinct y-values
-            if x_collision or np.any(y_prev != y):
-                split_point = (x_prev + x)/2
-                yield SplitGT(feature, split_point)
-            # Reset collision flag when advancing in x-space
-            x_collision = False
-        else:
-            # Detect y-collision
-            if np.any(y_prev != y):
-                x_collision = True
 
 # TODO: Remove later
 fayyad_thresholds_p = fayyad_thresholds
 
-def one_vs_all(data, feature):
-    """
-    Generator for one-vs-all splits.
-    :param data: Input data matrix, n-by-d
-    :param feature: Index of splitting feature (integer >=0 and <d)
-    """
-
-    if isinstance(data, pd.DataFrame):
-        column = data.iloc[:,feature]
-        if category_dtype == column.dtype:
-            values = column.cat.categories
-        else:
-            values = column.unique()
-        
-        feature_name = data.columns[feature]
-    else:
-        values = np.unique(data[:,feature])
-        feature_name = None
-    
-    for x in values:
-        yield SplitOneVsAll(feature, x, feature_name=feature_name)
 
 
 def binary_threshold(data, feature):
@@ -186,13 +52,7 @@ def binary_threshold(data, feature):
         yield [LEQConstraint(feature, x_i[feature]), GTConstraint(feature, x_i[feature])]
 
 
-def all_values_split(feature, values):
-    """
-    Generator for all-value splits.
-    :param feature: Feature index
-    :param values: List of possible feature values
-    """
-    yield SplitEveryValue(feature, values)
+
 
 
 def compose_splitting_strategies(spec_list):

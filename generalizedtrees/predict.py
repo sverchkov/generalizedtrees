@@ -1,4 +1,4 @@
-# Functions and mixins implementing decision tree prediction
+# Classes and functions implementing decision tree prediction
 #
 # Copyright 2020 Yuriy Sverchkov
 #
