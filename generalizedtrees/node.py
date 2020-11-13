@@ -14,14 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod
-from typing import Iterable, Protocol, Optional
+from typing import Protocol, Optional, Tuple
 
 import numpy as np
 
-from generalizedtrees.leaves import LocalEstimator
-from generalizedtrees.constraints import Constraint
 from generalizedtrees.base import SplitTest
+from generalizedtrees.constraints import Constraint
+from generalizedtrees.generate import DataFactoryLC
+from generalizedtrees.leaves import LocalEstimator
 
 
 # Interface definition:
@@ -33,8 +33,14 @@ class Node(Protocol):
     model: Optional[LocalEstimator] = None
     split: Optional[SplitTest] = None
 
-    @abstractmethod
-    def generate_children(self) -> Iterable['Node']:
-        raise NotImplementedError
+# Implementations
+
+# Model translation node
+class MTNode(Node):
+
+    n_training: int
+    constraints: Tuple[Constraint, ...]
+    data_factory: DataFactoryLC
+
 
 

@@ -15,12 +15,15 @@
 # limitations under the License.
 
 from abc import abstractmethod
-from generalizedtrees.givens import GivensLC, SupervisedDataGivensLC
+from generalizedtrees.generate import DataFactoryLC
+
+from numpy.lib.arraysetops import unique
+from generalizedtrees.givens import DataWithOracleGivensLC, GivensLC, SupervisedDataGivensLC
 from generalizedtrees.leaves import LocalEstimator
 
 import numpy as np
-from generalizedtrees.node import Node
-from typing import Callable, Iterable, Protocol
+from generalizedtrees.node import MTNode, Node
+from typing import Callable, Generic, Iterable, Optional, Protocol, Type, TypeVar
 
 from generalizedtrees.base import SplitTest
 from generalizedtrees.queues import CanPushPop
@@ -33,25 +36,32 @@ from generalizedtrees.tree import Tree
 # Node builder components #
 ###########################
 
+N = TypeVar('N', Node)
+
 # Interface definition
-class NodeBuilderLC(Protocol):
+class NodeBuilderLC(Protocol, Generic[N]):
+
+    node_type: Type[N]
+    new_model: Callable[[], LocalEstimator]
 
     @abstractmethod
     def initialize(self, givens: GivensLC) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def create_root(self) -> Node:
+    def create_root(self) -> N:
         raise NotImplementedError
 
     @abstractmethod
-    def generate_children(self, node: Node) -> Iterable[Node]:
+    def generate_children(self, node: N) -> Iterable[N]:
         raise NotImplementedError
 
-# Implementations
-class SupervisedNodeBuilderLC(NodeBuilderLC):
 
-    new_model: Callable[[], LocalEstimator]
+# Implementations
+
+# For supervised learning
+class SupervisedNodeBuilderLC(NodeBuilderLC[Node]):
+
     data: np.ndarray
     y: np.ndarray
 
@@ -59,13 +69,97 @@ class SupervisedNodeBuilderLC(NodeBuilderLC):
         assert(isinstance(givens, SupervisedDataGivensLC))
         self.data = givens.data_matrix
         self.y = givens.target_matrix
+    
+    def create_root(self) -> Node:
+        node = self.node_type()
+        node.data = self.data
+        node.y = self.y
+        node.model = self.new_model()
+        node.model.fit(node.data, node.y)
+        return node
+    
+    def generate_children(self, node: Node) -> Iterable[Node]:
+        if node.split is not None:
+            branches = node.split.pick_branches(node.data)
+            # TODO: Check that data goes into multiple branches
+            # Or should it be that some data goes to each branch?
+            for b, c in enumerate(node.split.constraints):
+                idx = branches == b
+                # Possible patch: if idx is empty, copy model from parent
+                child = self.node_type()
+                child.data = node.data[idx, :]
+                child.y = node.y[idx, :]
+                child.model = self.new_model()
+                child.model.fit(child.data, node.y)
+                child.local_constraint = c
+                yield child
+              
 
+# For model translation
+class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
 
-class ModelTranslationNodeBuilderLC(NodeBuilderLC):
+    min_samples: int
 
     training_data: np.ndarray
+    training_y: Optional[np.ndarray]
     oracle: Callable
-    data_generator: Callable
+    data_factory: DataFactoryLC
+
+    def initialize(self, givens: GivensLC) -> None:
+        assert(isinstance(givens, DataWithOracleGivensLC))
+        self.training_data = givens.data_matrix
+        self.training_y = givens.target_matrix
+        self.oracle = givens.oracle
+        self.data_factory.feature_spec = givens.feature_spec
+    
+    def create_root(self) -> MTNode:
+
+        node = self.node_type()
+
+        node.n_training = self.training_data.shape[0]
+
+        node.data_factory = self.data_factory.refit(self.training_data)
+
+        gen_data = node.data_factory.generate(self.min_samples - node.n_training)
+
+        node.data = np.row_stack((self.training_data, gen_data))
+
+        node.y = self.oracle(node.data)
+
+        node.model = self.new_model()
+        node.model.fit(node.data, node.y)
+
+        node.constraints = ()
+
+        return node
+
+    def generate_children(self, node: MTNode) -> Iterable[MTNode]:
+
+        if node.split is not None:
+            branches = node.split.pick_branches(node.data)
+            for b, c in enumerate(node.split.constraints):
+                idx = branches == b
+
+                child = self.node_type()
+
+                child.n_training = idx[0:node.n_training].sum()
+                pregen_data = node.data[idx, :]
+
+                child.data_factory = node.data_factory.refit(pregen_data[0:child.n_training, :])
+
+                gen_data = child.data_factory.generate(self.min_samples - pregen_data.shape[0])
+                gen_y = self.oracle(gen_data)
+
+                child.data = np.row_stack((pregen_data, gen_data))
+                child.y = np.row_stack((node.y[idx, :], gen_y))
+
+                child.model = self.new_model()
+                child.model.fit(child.data, child.y)
+
+                child.local_constraint = c
+                child.constraints = node.constraints + (c,)
+
+                yield child
 
 
 ###########################
