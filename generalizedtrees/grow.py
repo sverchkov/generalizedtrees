@@ -14,14 +14,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from generalizedtrees.stop import GlobalStopLC, LocalStopLC
-from typing import Callable, Iterable
+from abc import abstractmethod
+from generalizedtrees.givens import GivensLC, SupervisedDataGivensLC
+from generalizedtrees.leaves import LocalEstimator
+
+import numpy as np
+from generalizedtrees.node import Node
+from typing import Callable, Iterable, Protocol
 
 from generalizedtrees.base import SplitTest
 from generalizedtrees.queues import CanPushPop
+from generalizedtrees.split import SplitConstructorLC
+from generalizedtrees.stop import GlobalStopLC, LocalStopLC
 from generalizedtrees.tree import Tree
 
-# Builder components
+
+###########################
+# Node builder components #
+###########################
+
+# Interface definition
+class NodeBuilderLC(Protocol):
+
+    @abstractmethod
+    def initialize(self, givens: GivensLC) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_root(self) -> Node:
+        raise NotImplementedError
+
+    @abstractmethod
+    def generate_children(self, node: Node) -> Iterable[Node]:
+        raise NotImplementedError
+
+# Implementations
+class SupervisedNodeBuilderLC(NodeBuilderLC):
+
+    new_model: Callable[[], LocalEstimator]
+    data: np.ndarray
+    y: np.ndarray
+
+    def initialize(self, givens: GivensLC) -> None:
+        assert(isinstance(givens, SupervisedDataGivensLC))
+        self.data = givens.data_matrix
+        self.y = givens.target_matrix
+
+
+class ModelTranslationNodeBuilderLC(NodeBuilderLC):
+
+    training_data: np.ndarray
+    oracle: Callable
+    data_generator: Callable
+
+
+###########################
+# Tree builder components #
+###########################
 
 # Future: define interface protocol if we will ever have other builder strategies
 
@@ -31,15 +80,14 @@ class GreedyBuilderLC:
     """
 
     new_queue: Callable[..., CanPushPop]
-    create_root: Callable
-    generate_children: Callable[..., Iterable]
-    construct_split: Callable[..., SplitTest]
+    node_builder: NodeBuilderLC
+    splitter: SplitConstructorLC
     global_stop: GlobalStopLC
     local_stop: LocalStopLC
 
     def build_tree(self):
 
-        root = self.create_root()
+        root = self.node_builder.create_root()
         tree = Tree([root])
 
         queue = self.new_queue()
@@ -51,10 +99,10 @@ class GreedyBuilderLC:
 
             if not self.local_stop.check(tree.node(ptr)):
 
-                node.split = self.construct_split(node)
+                node.split = self.splitter.construct_split(node)
 
                 if node.split is not None:
-                    for child in self.generate_children(node):
+                    for child in self.node_builder.generate_children(node):
                         child_ptr = tree.add_node(child, parent_key=ptr)
                         queue.push((child, child_ptr))
         

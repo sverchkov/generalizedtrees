@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from generalizedtrees.split import SplitCandidateGeneratorLC, SplitScoreLC
 from generalizedtrees.stop import GlobalStopLC, LocalStopLC, NeverStopLC
 from generalizedtrees.queues import CanPushPop
 from typing import Callable
@@ -58,6 +59,22 @@ class GreedyTreeLearner:
     def global_stop(self, value: GlobalStopLC):
         self.builder.global_stop = value
 
+    @property
+    def split_score(self) -> SplitScoreLC:
+        return self.builder.splitter.split_scorer
+    
+    @split_score.setter
+    def split_score(self, value: SplitScoreLC):
+        self.builder.splitter.split_scorer = value
+    
+    @property
+    def split_generator(self) -> SplitCandidateGeneratorLC:
+        return self.builder.splitter.split_generator
+    
+    @split_generator.setter
+    def split_generator(self, value: SplitCandidateGeneratorLC):
+        self.builder.splitter.split_generator = value
+    
     def set_queue(self, queue = Callable[..., CanPushPop]):
         self.builder.new_queue = queue
 
@@ -75,6 +92,7 @@ class GreedyTreeLearner:
         
         # Set components
         self.predictor.set_target_names(self.givens.target_names)
+        self.builder.node_builder.initialize(self.givens)
 
         # Build tree
         self.tree = self.builder.build_tree()
