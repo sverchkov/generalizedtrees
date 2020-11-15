@@ -15,7 +15,6 @@
 # limitations under the License.
 
 from abc import abstractmethod
-from generalizedtrees.givens import GivensLC
 from logging import getLogger
 from typing import Container, Iterable, Protocol, Optional
 from functools import cached_property
@@ -24,8 +23,9 @@ from operator import itemgetter
 import numpy as np
 
 from generalizedtrees.base import SplitTest
-from generalizedtrees.features import FeatureSpec
 from generalizedtrees.constraints import LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
+from generalizedtrees.features import FeatureSpec
+from generalizedtrees.givens import GivensLC
 from generalizedtrees import scores
 
 logger = getLogger()
@@ -232,19 +232,25 @@ class DiscreteInformationGainLC(SplitScoreLC):
 
     def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
         branches = split.pick_branches(data)
-        return scores.entropy(y) - sum(map(
-            lambda b: scores.entropy(y[branches == b]),
+        return scores.entropy_of_label_column(y) - sum(map(
+            lambda b: scores.entropy_of_label_column(y[branches == b]),
             np.unique(branches)))
 
 
-class ProbabilityInformationGainLC(SplitScoreLC):
+class ProbabilityImpurityLC(SplitScoreLC):
+
+    def __init__(self, impurity: str = 'gini') -> None:
+        if impurity == 'gini':
+            self.impurity = scores.gini_of_p_matrix
+        else: #information gain
+            self.impurity = scores.entropy_of_p_matrix
 
     def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
         
         branches = split.pick_branches(data)
 
-        return scores.entropy_of_p_matrix(y) - sum(map(
-            lambda b: scores.entropy_of_p_matrix(y[branches==b, :]),
+        return self.impurity(y) - sum(map(
+            lambda b: self.impurity(y[branches==b, :]),
             np.unique(branches)
         ))
 

@@ -108,6 +108,20 @@ class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
     oracle: Callable
     data_factory: DataFactoryLC
 
+
+    def __init__(
+        self,
+        leaf_model: Callable[[], LocalEstimator],
+        min_samples: int,
+        data_factory: DataFactoryLC,
+        node_type: Type[MTNode] = MTNode
+    ) -> None:
+        self.node_type = node_type
+        self.new_model = leaf_model
+        self.min_samples = min_samples
+        self.data_factory = data_factory
+    
+
     def initialize(self, givens: GivensLC) -> None:
         assert(isinstance(givens, DataWithOracleGivensLC))
         self.training_data = givens.data_matrix
@@ -133,6 +147,8 @@ class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
         node.model.fit(node.data, node.y)
 
         node.constraints = ()
+
+        node.coverage = 1
 
         return node
 
@@ -161,6 +177,8 @@ class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
 
                 child.local_constraint = c
                 child.constraints = node.constraints + (c,)
+
+                child.coverage = node.coverage * sum(idx) / len(idx)
 
                 yield child
 

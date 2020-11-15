@@ -137,8 +137,8 @@ class DataWithOracleGivensLC(GivensLC):
             targets = oracle(self.data_matrix)
 
             # Infer target_names if not given
-            if self.target_names is not None:
-                # Assume that oracle yields matrix
+            if self.target_names is None:
+                # Assume that oracle yields matrix or dataframe
                 self.target_names = getattr(targets, 'columns', np.arange(targets.shape[1]))
             
             # Assume that oracle yields matrix

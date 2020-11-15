@@ -19,7 +19,7 @@ from numpy.testing import assert_allclose
 
 def test_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
 
-    from generalizedtrees.recipes import Trepan
+    from generalizedtrees.recipes import trepan
     from generalizedtrees.features import FeatureSpec
     from time import perf_counter
     import logging
@@ -37,7 +37,7 @@ def test_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
     t1 = perf_counter()
 
     logger.info("Creating class instance")
-    trepan = Trepan()
+    trepan = trepan(max_attempts=3)
 
     logger.info("Fitting tree")
     trepan.fit(x_train, model.predict_proba, feature_spec = (FeatureSpec.CONTINUOUS,)*d)
@@ -58,7 +58,7 @@ def test_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
 
 def test_trepan_pandas(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
 
-    from generalizedtrees.recipes import Trepan
+    from generalizedtrees.recipes import trepan
     import pandas as pd
     from time import perf_counter
     import logging
@@ -78,10 +78,10 @@ def test_trepan_pandas(breast_cancer_data_pandas, breast_cancer_rf_model, caplog
     t1 = perf_counter()
 
     logger.info('Creating class instance')
-    trepan = Trepan()
+    trepan = trepan(max_attempts=3)
 
     logger.info('Fitting tree')
-    oracle = lambda x: pd.DataFrame(model.predict_proba(x), columns=target_names)
+    oracle = lambda x: model.predict_proba(x)
     trepan.fit(x_train, oracle)
 
     t2 = perf_counter()

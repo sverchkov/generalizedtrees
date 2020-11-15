@@ -14,11 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import cached_property
 from typing import Protocol, Optional, Tuple
 
 import numpy as np
 
-from generalizedtrees.base import SplitTest
+from generalizedtrees.base import SplitTest, order_by
 from generalizedtrees.constraints import Constraint
 from generalizedtrees.generate import DataFactoryLC
 from generalizedtrees.leaves import LocalEstimator
@@ -43,8 +44,21 @@ class Node(NodeI):
 class MTNode(NodeI):
 
     n_training: int
+    coverage: float
     constraints: Tuple[Constraint, ...]
     data_factory: DataFactoryLC
+
+# Trepan node
+@order_by('score')
+class TrepanNode(MTNode):
+
+    @cached_property
+    def score(self):
+        return -(self.coverage * (1 - self.fidelity))
+    
+    @cached_property
+    def fidelity(self):
+        return sum((self.y * self.model.estimate(self.data)).mean(axis=0))
 
 
 

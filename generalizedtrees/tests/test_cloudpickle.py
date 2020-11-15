@@ -26,10 +26,8 @@ except:
 def test_trepan_cloudpickle_serialization(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
 
     import logging
-    from generalizedtrees.recipes import Trepan
+    from generalizedtrees.recipes import trepan
     import pandas as pd
-    from generalizedtrees.tree import tree_to_str
-    from generalizedtrees.composing import show_node
     
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
@@ -41,25 +39,14 @@ def test_trepan_cloudpickle_serialization(breast_cancer_data_pandas, breast_canc
 
     # Learn explanation
     logger.info('Creating class instance')
-    trepan = Trepan()
+    trepan = trepan(max_attempts=3)
 
     logger.info('Fitting tree')
-    oracle = lambda x: pd.DataFrame(model.predict_proba(x), columns=target_names)
+    oracle = lambda x: model.predict_proba(x)
     trepan.fit(x_train, oracle)
 
     tree_str = trepan.show_tree()
     logger.info(f'Learned tree:\n{tree_str}')
-
-    logger.info('Pickling internal tree')
-    bytes_obj = cp.dumps(trepan.tree)
-
-    logger.info('Unpickling internal tree')
-    returned_internal_tree = cp.loads(bytes_obj)
-
-    returned_internal_tree_str = tree_to_str(returned_internal_tree, show_node)
-    logger.info(f'Unpickled internal tree:\n{returned_internal_tree_str}')
-
-    assert returned_internal_tree_str == tree_str
 
     logger.info('Pickling Trepan instance')
     bytes_obj = cp.dumps(trepan)

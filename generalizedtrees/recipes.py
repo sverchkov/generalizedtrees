@@ -15,13 +15,15 @@
 # limitations under the License.
 
 
+from generalizedtrees.node import TrepanNode
+from generalizedtrees.generate import TrepanDataFactoryLC
 from generalizedtrees.leaves import ConstantEstimator
-from generalizedtrees.grow import SupervisedNodeBuilderLC
-from generalizedtrees.stop import LocalStopDepthLC
-from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC
-from generalizedtrees.queues import Queue
-from generalizedtrees.predict import BinaryClassifierLC
-from generalizedtrees.givens import SupervisedDataGivensLC
+from generalizedtrees.grow import ModelTranslationNodeBuilderLC, SupervisedNodeBuilderLC
+from generalizedtrees.stop import GlobalStopTreeSizeLC, LocalStopDepthLC
+from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC, ProbabilityImpurityLC
+from generalizedtrees.queues import Heap, Queue
+from generalizedtrees.predict import BinaryClassifierLC, ClassifierLC
+from generalizedtrees.givens import DataWithOracleGivensLC, SupervisedDataGivensLC
 from generalizedtrees.learn import GreedyTreeLearner
 
 
@@ -38,6 +40,37 @@ def binary_decision_tree_classifier(max_depth: int) -> GreedyTreeLearner:
 
     return learner
 
+
+def decision_tree_classifier(max_depth: int, impurity = 'entropy') -> GreedyTreeLearner:
+
+    learner = GreedyTreeLearner()
+    learner.givens = SupervisedDataGivensLC()
+    learner.predictor = ClassifierLC()
+    learner.queue = Queue
+    learner.local_stop = LocalStopDepthLC(max_depth)
+    learner.split_score = ProbabilityImpurityLC(impurity)
+    learner.split_generator = AxisAlignedSplitGeneratorLC()
+    learner.node_builder = SupervisedNodeBuilderLC(ConstantEstimator)
+
+    return learner
+
+
+def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0.05, max_attempts = 1000):
+
+    learner = GreedyTreeLearner()
+    learner.givens = DataWithOracleGivensLC()
+    learner.predictor = ClassifierLC()
+    learner.queue = Heap
+    learner.global_stop = GlobalStopTreeSizeLC(max_tree_size)
+    learner.split_score = ProbabilityImpurityLC('entropy')
+    learner.split_generator = AxisAlignedSplitGeneratorLC()
+    learner.node_builder = ModelTranslationNodeBuilderLC(
+        leaf_model=ConstantEstimator,
+        min_samples=min_samples,
+        data_factory=TrepanDataFactoryLC(alpha=dist_test_alpha, max_attempts=max_attempts),
+        node_type=TrepanNode)
+
+    return learner
 
 # Version of Trepan that uses hard target estimation for split scoring
 # TrepanV1 = greedy_classification_tree_learner(

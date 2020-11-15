@@ -17,7 +17,8 @@
 import numpy as np
 
 
-def gini(y):
+def gini_of_label_column(y):
+
     n: int = len(y)
 
     if n == 0:
@@ -25,10 +26,20 @@ def gini(y):
 
     p = np.unique(y, return_counts=True)[1] / n
 
-    return 1 - sum(p*p)
+    return 1 - np.sum(p*p)
 
 
-def entropy(y):
+def gini_of_p_matrix(pm: np.ndarray):
+
+    if len(pm) == 0: return 0
+
+    p = pm.mean(axis=0)
+
+    return 1 - np.sum(p*p)
+
+
+def entropy_of_label_column(y):
+
     n = len(y)
 
     if n == 0:
@@ -43,8 +54,9 @@ def entropy_of_p_matrix(pm):
 
     return entropy_of_p_vector(np.mean(pm, axis=0))
 
+
 def entropy_of_p_vector(p):
     
     pl2p = np.where(p > 0, - p * np.log2(p, where = p > 0), 0)
 
-    return sum(pl2p)
+    return pl2p.sum()

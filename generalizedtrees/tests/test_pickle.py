@@ -55,7 +55,7 @@ def test_dtc_serialization(breast_cancer_data, caplog):
 
 
 @pytest.mark.skip(reason="Current Trepan uses lambdas which are not picklable")
-def test_trepan_tree_only_serialization(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
+def test_trepan_serialization(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
 
     import logging
     from generalizedtrees.recipes import Trepan

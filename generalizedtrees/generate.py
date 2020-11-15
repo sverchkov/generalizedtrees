@@ -98,7 +98,8 @@ class TrepanDataFactoryLC(DataFactoryLC):
     data_matrix: Optional[np.ndarray] = None
     alpha: float
 
-    max_attemts: int
+    max_attempts: int
+    max_sample: int
     on_timeout: str = 'partial'
     rng: np.random.Generator
 
@@ -106,13 +107,30 @@ class TrepanDataFactoryLC(DataFactoryLC):
         self,
         alpha: float = 0.05,
         max_attempts: int = 1000,
+        max_sample: int = 100000,
         on_timeout: str = 'partial',
         rng: np.random.Generator = np.random.default_rng()) -> None:
 
         self.alpha = alpha
-        self.max_attemts = max_attempts
+        self.max_attempts = max_attempts
+        self.max_sample = max_sample
         self.on_timeout = on_timeout
         self.rng = rng
+
+
+    def copy(self) -> 'TrepanDataFactoryLC':
+        """
+        Make a deep copy
+        """
+        clone = TrepanDataFactoryLC(
+            alpha=self.alpha,
+            max_attempts=self.max_attempts,
+            max_sample=self.max_sample,
+            on_timeout=self.on_timeout,
+            rng=self.rng)
+        clone.feature_spec = self.feature_spec
+
+        return clone
 
 
     def refit(self, data_matrix: np.ndarray) -> 'DataFactoryLC':
@@ -122,7 +140,10 @@ class TrepanDataFactoryLC(DataFactoryLC):
         ):
             return self
         
-        self.data_matrix = data_matrix
+        clone = self.copy()
+        clone.data_matrix = data_matrix
+
+        return clone
     
     def generate(self, n: int, constraints: Iterable[Constraint] = ()) -> np.ndarray:
 
@@ -145,6 +166,12 @@ class TrepanDataFactoryLC(DataFactoryLC):
                 n_sampled = round(min(needed * oversample_prop, self.max_sample))
                 sample = self._generate(n_sampled)
                 accepted = test(constraints, sample)
+
+                #if not all(accepted):
+                #    logger.debug(f'Constraints: {constraints}')
+                #    for j in np.nonzero(accepted):
+                #        logger.debug(f'Rejected sample: {sample[j,:]}')
+                
                 n_acc = sum(accepted)
                 n_fit = min(n_acc, needed)
                 logger.debug(
@@ -181,7 +208,7 @@ class TrepanDataFactoryLC(DataFactoryLC):
             return self.rng.normal(
                 loc = self.rng.choice(self.data_matrix[:, i], size=n),
                 scale = 1/np.sqrt(self.data_matrix.shape[0]),
-                size = n)[0]
+                size = n)
 
         elif self.feature_spec[i] & FeatureSpec.DISCRETE:
             # Sample from the empirical distribution
