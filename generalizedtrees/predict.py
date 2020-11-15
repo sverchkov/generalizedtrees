@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from abc import abstractmethod
+from generalizedtrees.givens import GivensLC
 from typing import Protocol
 
 import numpy as np
@@ -75,7 +76,7 @@ class PredictorLC(Protocol):
     """
 
     @abstractmethod
-    def set_target_names(self, target_names: np.ndarray) -> None:
+    def initialize(self, givens: GivensLC) -> 'PredictorLC':
         raise NotImplementedError
 
     def predict(self, tree: Tree, data_matrix: np.ndarray) -> np.ndarray:
@@ -95,8 +96,8 @@ class RegressorLC(PredictorLC):
 
     target_dim: int
 
-    def set_target_names(self, target_names: np.ndarray) -> None:
-        self.target_dim = len(target_names)
+    def initialize(self, givens: GivensLC) -> PredictorLC:
+        self.target_dim = len(givens.target_names)
 
     def predict(self, tree: Tree, data_matrix: np.ndarray):
         return estimate(tree, data_matrix, self.target_dim)
@@ -114,8 +115,8 @@ class BaseClassifierLC(PredictorLC):
 
     target_names: np.ndarray
 
-    def set_target_names(self, target_names: np.ndarray) -> None:
-        self.target_names = target_names
+    def initialize(self, givens: GivensLC) -> PredictorLC:
+        self.target_names = givens.target_names
 
     def predict(self, tree: Tree, data_matrix: np.ndarray):
 
@@ -133,12 +134,12 @@ class ClassifierLC(BaseClassifierLC):
 
     def predict_proba(self, tree: Tree, data_matrix: np.ndarray):
 
-        proba = estimate(self.tree, data_matrix, len(self.classes_))
+        proba = estimate(tree, data_matrix, len(self.target_names))
 
         return proba
 
 
-class TreeBinaryClassifierMixin(BaseClassifierLC):
+class BinaryClassifierLC(BaseClassifierLC):
     """
     Binary Classifier LC
 
@@ -149,7 +150,7 @@ class TreeBinaryClassifierMixin(BaseClassifierLC):
 
     def predict_proba(self, tree: Tree, data_matrix: np.ndarray):
 
-        p_1 = estimate(self.tree, data_matrix, 1)
+        p_1 = estimate(tree, data_matrix, 1)
         proba = np.concatenate((1 - p_1, p_1), axis=1)
 
         return proba

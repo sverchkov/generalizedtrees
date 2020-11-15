@@ -29,8 +29,7 @@ class LocalEstimator(Protocol):
 
 class ConstantEstimator(LocalEstimator):
 
-    def __init__(self):
-        self.est_vector: np.ndarray
+    est_vector: np.ndarray
     
     def fit(self, x=None, y=None, **kwargs):
 

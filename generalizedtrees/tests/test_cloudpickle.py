@@ -79,14 +79,14 @@ def test_trepan_cloudpickle_serialization(breast_cancer_data_pandas, breast_canc
 def test_composed_dtc_cloudpickle_serialization(breast_cancer_data, caplog):
 
     import logging
-    from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.recipes import binary_decision_tree_classifier
     from generalizedtrees.features import FeatureSpec
 
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
 
     logger.info("Creating class instance")
-    dtc = DecisionTreeClassifier(max_depth = 5)
+    dtc = binary_decision_tree_classifier(max_depth = 5)
 
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]

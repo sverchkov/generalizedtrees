@@ -22,13 +22,12 @@ from generalizedtrees.givens import DataWithOracleGivensLC, GivensLC, Supervised
 from generalizedtrees.leaves import LocalEstimator
 
 import numpy as np
-from generalizedtrees.node import MTNode, Node
+from generalizedtrees.node import MTNode, Node, NodeI
 from typing import Callable, Generic, Iterable, Optional, Protocol, Type, TypeVar
 
-from generalizedtrees.base import SplitTest
 from generalizedtrees.queues import CanPushPop
 from generalizedtrees.split import SplitConstructorLC
-from generalizedtrees.stop import GlobalStopLC, LocalStopLC
+from generalizedtrees.stop import GlobalStopLC, LocalStopLC, NeverStopLC
 from generalizedtrees.tree import Tree
 
 
@@ -36,7 +35,7 @@ from generalizedtrees.tree import Tree
 # Node builder components #
 ###########################
 
-N = TypeVar('N', Node)
+N = TypeVar('N', bound=NodeI)
 
 # Interface definition
 class NodeBuilderLC(Protocol, Generic[N]):
@@ -65,6 +64,10 @@ class SupervisedNodeBuilderLC(NodeBuilderLC[Node]):
     data: np.ndarray
     y: np.ndarray
 
+    def __init__(self, leaf_model: Callable[[], LocalEstimator]) -> None:
+        self.node_type = Node
+        self.new_model = leaf_model
+
     def initialize(self, givens: GivensLC) -> None:
         assert(isinstance(givens, SupervisedDataGivensLC))
         self.data = givens.data_matrix
@@ -90,7 +93,7 @@ class SupervisedNodeBuilderLC(NodeBuilderLC[Node]):
                 child.data = node.data[idx, :]
                 child.y = node.y[idx, :]
                 child.model = self.new_model()
-                child.model.fit(child.data, node.y)
+                child.model.fit(child.data, child.y)
                 child.local_constraint = c
                 yield child
               
@@ -175,9 +178,9 @@ class GreedyBuilderLC:
 
     new_queue: Callable[..., CanPushPop]
     node_builder: NodeBuilderLC
-    splitter: SplitConstructorLC
-    global_stop: GlobalStopLC
-    local_stop: LocalStopLC
+    splitter: SplitConstructorLC = SplitConstructorLC()
+    global_stop: GlobalStopLC = NeverStopLC()
+    local_stop: LocalStopLC = NeverStopLC()
 
     def build_tree(self):
 

@@ -15,8 +15,9 @@
 # limitations under the License.
 
 from abc import abstractmethod
+from generalizedtrees.givens import GivensLC
 from logging import getLogger
-from typing import Iterable, Protocol, Tuple, Optional
+from typing import Container, Iterable, Protocol, Optional
 from functools import cached_property
 from operator import itemgetter
 
@@ -184,6 +185,10 @@ def all_values_split(feature, values):
 class SplitCandidateGeneratorLC(Protocol):
 
     @abstractmethod
+    def initialize(self, givens: GivensLC) -> 'SplitCandidateGeneratorLC':
+        raise NotImplementedError
+
+    @abstractmethod
     def genenerator(self, data: np.ndarray, y: np.ndarray) -> Iterable[SplitTest]:
         raise NotImplementedError
 
@@ -191,7 +196,11 @@ class SplitCandidateGeneratorLC(Protocol):
 # Default implementation for single-feature axis-aligned splits:
 class AxisAlignedSplitGeneratorLC(SplitCandidateGeneratorLC):
 
-    feature_spec: Tuple[FeatureSpec]
+    feature_spec: Container[FeatureSpec]
+
+    def initialize(self, givens: GivensLC) -> 'SplitCandidateGeneratorLC':
+        self.feature_spec = givens.feature_spec
+        return self
 
     def genenerator(self, data: np.ndarray, y: np.ndarray) -> Iterable[SplitTest]:
 
@@ -357,7 +366,7 @@ class SplitConstructorLC:
         best_split = None
         best_split_score = 0
         for split in self.split_generator.genenerator(data, y):
-            new_score = self.split_scorer.score(split, node, data, y)
+            new_score = self.split_scorer.score(node, split, data, y)
             if new_score > best_split_score:
                 best_split_score = new_score
                 best_split = split

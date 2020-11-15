@@ -16,11 +16,10 @@
 
 import pytest
 
-@pytest.mark.skip(reason="Composed classes are not picklable in current version")
 def test_dtc_serialization(breast_cancer_data, caplog):
 
     import logging
-    from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.recipes import binary_decision_tree_classifier
     from generalizedtrees.features import FeatureSpec
     from pickle import dumps, loads
 
@@ -28,7 +27,7 @@ def test_dtc_serialization(breast_cancer_data, caplog):
     caplog.set_level(logging.DEBUG)
 
     logger.info("Creating class instance")
-    dtc = DecisionTreeClassifier(max_depth = 5)
+    dtc = binary_decision_tree_classifier(max_depth = 5)
 
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
@@ -51,41 +50,6 @@ def test_dtc_serialization(breast_cancer_data, caplog):
 
     logger.info("Running unpicled tree prediction")
     returned_dtc.predict(breast_cancer_data.x_test)
-
-    logger.info("Done")
-
-
-def test_dtc_tree_only_serialization(breast_cancer_data_pandas, caplog):
-
-    import logging
-    from generalizedtrees.recipes import DecisionTreeClassifier
-    from generalizedtrees.composing import show_node
-    from generalizedtrees.tree import tree_to_str
-    from pickle import dumps, loads
-
-    logger = logging.getLogger()
-    caplog.set_level(logging.DEBUG)
-
-    logger.info("Creating class instance")
-    dtc = DecisionTreeClassifier(max_depth = 5)
-
-    logger.info("Fitting tree")
-
-    dtc.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
-
-    tree_str = dtc.show_tree()
-    logger.info(f'Learned tree:\n{tree_str}')
-
-    logger.info('Pickling tree')
-    bytes_obj = dumps(dtc.tree)
-
-    logger.info('Unpickling tree')
-    returned_tree = loads(bytes_obj)
-
-    returned_tree_str = tree_to_str(returned_tree, show_node)
-    logger.info(f'Unpickled tree:\n{returned_tree_str}')
-
-    assert returned_tree_str == tree_str
 
     logger.info("Done")
 

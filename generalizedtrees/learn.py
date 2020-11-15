@@ -21,10 +21,10 @@ from typing import Callable
 import numpy as np
 from pandas import DataFrame
 
-from generalizedtrees.tree import Tree
+from generalizedtrees.tree import Tree, tree_to_str
 from generalizedtrees.predict import PredictorLC
 from generalizedtrees.givens import GivensLC
-from generalizedtrees.grow import GreedyBuilderLC
+from generalizedtrees.grow import GreedyBuilderLC, NodeBuilderLC
 
 class GreedyTreeLearner:
 
@@ -66,7 +66,7 @@ class GreedyTreeLearner:
     @split_score.setter
     def split_score(self, value: SplitScoreLC):
         self.builder.splitter.split_scorer = value
-    
+
     @property
     def split_generator(self) -> SplitCandidateGeneratorLC:
         return self.builder.splitter.split_generator
@@ -75,11 +75,28 @@ class GreedyTreeLearner:
     def split_generator(self, value: SplitCandidateGeneratorLC):
         self.builder.splitter.split_generator = value
     
+    @property
+    def node_builder(self) -> NodeBuilderLC:
+        return self.builder.node_builder
+    
+    @node_builder.setter
+    def node_builder(self, value: NodeBuilderLC):
+        self.builder.node_builder = value
+
     def set_queue(self, queue = Callable[..., CanPushPop]):
         self.builder.new_queue = queue
 
     # Setting individual components after initialization shoud use python property/attribute setting syntax
     queue = property(None, set_queue)
+
+    # Read-only properties
+    @property
+    def target_names(self):
+        return self.givens.target_names
+    
+    @property
+    def feature_names(self):
+        return self.givens.feature_names
 
     def fit(self, *args, **kwargs):
         
@@ -91,8 +108,9 @@ class GreedyTreeLearner:
         self.givens.process(*args, **kwargs)
         
         # Set components
-        self.predictor.set_target_names(self.givens.target_names)
+        self.predictor.initialize(self.givens)
         self.builder.node_builder.initialize(self.givens)
+        self.split_generator.initialize(self.givens)
 
         # Build tree
         self.tree = self.builder.build_tree()
@@ -140,3 +158,17 @@ class GreedyTreeLearner:
             self.tree
         except AttributeError:
             raise ValueError('Tried to predict before learning the tree.')
+    
+    def show_tree(self):
+
+        def show_node(node_obj):
+            if node_obj.split is None:
+                if node_obj.model is None:
+                    logger.critical('Malformed node encountered in tree printing.')
+                    return "Malformed node"
+                else:
+                    return str(node_obj.model)
+            else:
+                return str(node_obj.split)
+
+        return tree_to_str(self.tree, show_node)

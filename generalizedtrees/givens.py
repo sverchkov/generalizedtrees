@@ -51,6 +51,12 @@ class SupervisedDataGivensLC(GivensLC):
     Givens LC for the standard supervised learning setting
     """
 
+    def __init__(self, binary_classification: bool = False) -> None:
+        """
+        :param: binary_classification tells us to internally model only the probability of the +ve (second) class
+        """
+        self.binary_classification = binary_classification
+
     def process(
         self,
         data,
@@ -76,7 +82,7 @@ class SupervisedDataGivensLC(GivensLC):
             target_shape = 'matrix' if len(targets.shape) == 2 else 'label_vector'
         
         # Infer target_names if not given
-        if self.target_names is not None:
+        if self.target_names is None:
             if target_shape == 'label_vector':
                 self.target_names = np.unique(targets)
             else:
@@ -99,6 +105,10 @@ class SupervisedDataGivensLC(GivensLC):
             self.target_matrix = np.array([x == self.target_names for x in targets], dtype=float)
         else:
             self.target_matrix = targets
+
+        # Only keep the 2nd column for binary classification
+        if self.binary_classification:
+            self.target_matrix = self.target_matrix[:,[1]]
 
 
 # For unlabeled features + oracle
@@ -146,6 +156,7 @@ def parse_data(data, feature_names=None, feature_spec=None):
     else:
         raise ValueError(f'Expected 2-dimensional data array buy data shape is {data_shape}')
 
+    data_matrix = None
 
     if isinstance(data, pd.DataFrame):
         if feature_names is None:
@@ -173,9 +184,9 @@ def parse_data(data, feature_names=None, feature_spec=None):
 
     if isinstance(data, np.ndarray):
         data_matrix = data
-    else:
+    
+    if data_matrix is None:
         raise ValueError(f'Could not process a {type(data)} object: {data}')
-
     
     if feature_spec is None:
         raise NotImplementedError("Haven't implemented feature spec inference for this type yet")

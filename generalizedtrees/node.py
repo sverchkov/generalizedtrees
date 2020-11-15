@@ -25,7 +25,7 @@ from generalizedtrees.leaves import LocalEstimator
 
 
 # Interface definition:
-class Node(Protocol):
+class NodeI(Protocol):
 
     data: np.ndarray
     y: np.ndarray
@@ -35,8 +35,12 @@ class Node(Protocol):
 
 # Implementations
 
+# Supervised classification node adds nothing to the base interface
+class Node(NodeI):
+    pass
+
 # Model translation node
-class MTNode(Node):
+class MTNode(NodeI):
 
     n_training: int
     constraints: Tuple[Constraint, ...]

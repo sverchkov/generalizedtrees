@@ -52,7 +52,7 @@ def _constant_estimator_to_simplified(model: ConstantEstimator, explanation):
     # Check case of n-1-d estimator for n-ary classification
     est_vector = model.est_vector
     try:
-        if len(est_vector) < len(explanation.classes_):
+        if len(est_vector) < len(explanation.target_names):
             est_vector = concatenate([array([1-est_vector.sum()]), est_vector], axis=0)
     except IndexError:
         # est_vector must be scalar?
@@ -61,9 +61,9 @@ def _constant_estimator_to_simplified(model: ConstantEstimator, explanation):
     return {'estimate': [
         {
             'label_id': int(i),
-            'label': _ensure_native(explanation.classes_[i]),
+            'label': _ensure_native(explanation.target_names[i]),
             'value': _ensure_native(est_vector[i])}
-        for i in range(len(explanation.classes_))]}
+        for i in range(len(explanation.target_names))]}
 
 def _skl_linear_estimator_to_simplified(
     model: Union[SKProbaEstimator, BinSKProbaEstimator],

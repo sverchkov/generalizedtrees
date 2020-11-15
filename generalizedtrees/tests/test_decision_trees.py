@@ -20,14 +20,14 @@ from numpy.testing import assert_allclose
 def test_dtc(breast_cancer_data, caplog):
 
     import logging
-    from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.recipes import binary_decision_tree_classifier
     from generalizedtrees.features import FeatureSpec
 
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
 
     logger.info("Creating class instance")
-    dtc = DecisionTreeClassifier(max_depth = 5)
+    dtc = binary_decision_tree_classifier(max_depth = 5)
 
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
@@ -45,15 +45,16 @@ def test_dtc(breast_cancer_data, caplog):
 @pytest.mark.skip(reason="Don't know all the details to sklearn's implementation")
 def test_dtc_prediction(breast_cancer_data, caplog):
     import logging
-    from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.recipes import binary_decision_tree_classifier
     from generalizedtrees.features import FeatureSpec
     from sklearn.tree import DecisionTreeClassifier as SKDTC
+    from sklearn.tree import export_text
 
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
 
     logger.info("Creating class instance")
-    dtc = DecisionTreeClassifier(max_depth = 5)
+    dtc = binary_decision_tree_classifier(max_depth = 5)
 
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
@@ -68,6 +69,10 @@ def test_dtc_prediction(breast_cancer_data, caplog):
     logger.info("Running Scikit-Learn's DT")
     sk_dtc = SKDTC(criterion='entropy', max_depth=5)
     sk_dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train)
+
+    logger.info(f'SKLearn learned tree:\n{export_text(sk_dtc)}')
+
+    logger.info('Running SKLearn prediction')
     sk_pr = sk_dtc.predict(breast_cancer_data.x_test)
 
     logger.info("Comparing")
@@ -78,13 +83,13 @@ def test_dtc_prediction(breast_cancer_data, caplog):
 
 def test_dtc_pandas(breast_cancer_data_pandas, caplog):
     import logging
-    from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.recipes import binary_decision_tree_classifier
 
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
 
     logger.info("Creating class instance")
-    dtc = DecisionTreeClassifier(max_depth = 5)
+    dtc = binary_decision_tree_classifier(max_depth = 5)
 
     logger.info("Fitting tree")
 
@@ -100,7 +105,7 @@ def test_dtc_pandas(breast_cancer_data_pandas, caplog):
 def test_dtc_json(breast_cancer_data_pandas, caplog):
     import logging
     import pandas as pd
-    from generalizedtrees.recipes import DecisionTreeClassifier
+    from generalizedtrees.recipes import binary_decision_tree_classifier
     from generalizedtrees.vis import explanation_to_JSON
     from generalizedtrees.vis.vis import explanation_to_simplified
 
@@ -108,7 +113,7 @@ def test_dtc_json(breast_cancer_data_pandas, caplog):
     caplog.set_level(logging.DEBUG)
 
     logger.info("Creating class instance")
-    dtc = DecisionTreeClassifier(max_depth = 5)
+    dtc = binary_decision_tree_classifier(max_depth = 5)
 
     logger.info("Fitting tree")
 
