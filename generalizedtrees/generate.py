@@ -92,60 +92,15 @@ class DataFactoryLC(Protocol):
         raise NotImplementedError
 
 
-# Implementations
-class TrepanDataFactoryLC(DataFactoryLC):
+# Base classes
+class ConstraintFreeSamplingFactoryLC(DataFactoryLC):
 
     data_matrix: Optional[np.ndarray] = None
-    alpha: float
 
     max_attempts: int
     max_sample: int
     on_timeout: str = 'partial'
-    rng: np.random.Generator
 
-    def __init__(
-        self,
-        alpha: float = 0.05,
-        max_attempts: int = 1000,
-        max_sample: int = 100000,
-        on_timeout: str = 'partial',
-        rng: np.random.Generator = np.random.default_rng()) -> None:
-
-        self.alpha = alpha
-        self.max_attempts = max_attempts
-        self.max_sample = max_sample
-        self.on_timeout = on_timeout
-        self.rng = rng
-
-
-    def copy(self) -> 'TrepanDataFactoryLC':
-        """
-        Make a deep copy
-        """
-        clone = TrepanDataFactoryLC(
-            alpha=self.alpha,
-            max_attempts=self.max_attempts,
-            max_sample=self.max_sample,
-            on_timeout=self.on_timeout,
-            rng=self.rng)
-        clone.feature_spec = self.feature_spec
-
-        return clone
-
-
-    def refit(self, data_matrix: np.ndarray) -> 'DataFactoryLC':
-
-        if len(data_matrix) < 1 or (
-            self.data_matrix is not None and
-            same_distribution(data_matrix, self.data_matrix, feature_spec=self.feature_spec, alpha = self.alpha)
-        ):
-            return self
-        
-        clone = self.copy()
-        clone.data_matrix = data_matrix
-
-        return clone
-    
     def generate(self, n: int, constraints: Iterable[Constraint] = ()) -> np.ndarray:
 
         n = max(0, n)
@@ -194,7 +149,63 @@ class TrepanDataFactoryLC(DataFactoryLC):
                 return result
             else: # on_timeout == 'raise':
                 raise RuntimeError('Could not generate an acceptable sample within a reasonable time.')
-    
+
+
+    @abstractmethod
+    def _generate(self, n: int) -> np.ndarray:
+        raise NotImplementedError
+
+
+# Implementations
+class TrepanDataFactoryLC(ConstraintFreeSamplingFactoryLC):
+
+    alpha: float
+
+    rng: np.random.Generator
+
+    def __init__(
+        self,
+        alpha: float = 0.05,
+        max_attempts: int = 1000,
+        max_sample: int = 100000,
+        on_timeout: str = 'partial',
+        rng: np.random.Generator = np.random.default_rng()) -> None:
+
+        self.alpha = alpha
+        self.max_attempts = max_attempts
+        self.max_sample = max_sample
+        self.on_timeout = on_timeout
+        self.rng = rng
+
+
+    def copy(self) -> 'TrepanDataFactoryLC':
+        """
+        Make a deep copy
+        """
+        clone = TrepanDataFactoryLC(
+            alpha=self.alpha,
+            max_attempts=self.max_attempts,
+            max_sample=self.max_sample,
+            on_timeout=self.on_timeout,
+            rng=self.rng)
+        clone.feature_spec = self.feature_spec
+
+        return clone
+
+
+    def refit(self, data_matrix: np.ndarray) -> 'DataFactoryLC':
+
+        if len(data_matrix) < 1 or (
+            self.data_matrix is not None and
+            same_distribution(data_matrix, self.data_matrix, feature_spec=self.feature_spec, alpha = self.alpha)
+        ):
+            return self
+        
+        clone = self.copy()
+        clone.data_matrix = data_matrix
+
+        return clone
+        
     def _generate(self, n: int) -> np.ndarray:
 
         # The Trepan generator independently generates the individual feature values.
@@ -219,3 +230,40 @@ class TrepanDataFactoryLC(DataFactoryLC):
         else:
             raise ValueError(f"I don't know how to handle feature spec {self.feature_spec[i]}")
 
+
+class SmearingDataFactoryLC(ConstraintFreeSamplingFactoryLC):
+
+    p_alt: float
+    rng: np.random.Generator
+
+    def __init__(
+        self,
+        p_alt: float = 0.5,
+        max_attempts: int = 1000,
+        max_sample: int = 100000,
+        on_timeout: str = 'partial',
+        rng: np.random.Generator = np.random.default_rng()
+    ) -> None:
+
+        self.p_alt = p_alt
+        self.max_attempts = max_attempts
+        self.max_sample = max_sample
+        self.on_timeout = on_timeout
+        self.rng = rng
+
+    def refit(self, data_matrix: np.ndarray) -> DataFactoryLC:
+        if self.data_matrix is None:
+            self.data_matrix = data_matrix
+        
+        return self
+
+    def _generate(self, n) -> np.ndarray:
+
+        m, d = self.data_matrix.shape
+
+        matrix_a = self.data_matrix[self.rng.integers(m, size=n, dtype=np.intp),:]
+        matrix_b = self.data_matrix[self.rng.integers(m, size=n, dtype=np.intp),:]
+        replacemask = self.rng.choice([False, True], size=n*d, p=[1-self.p_alt, self.p_alt]).reshape(n,d)
+        matrix_a[replacemask] = matrix_b[replacemask]
+
+        return matrix_a       

@@ -16,8 +16,7 @@
 
 def test_bat(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
 
-    from generalizedtrees.recipes import BornAgain
-    import pandas as pd
+    from generalizedtrees.recipes import born_again_tree
     from time import perf_counter
     import logging
 
@@ -27,8 +26,7 @@ def test_bat(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
     x_train = breast_cancer_data_pandas.x_train
     x_test = breast_cancer_data_pandas.x_test
     model = breast_cancer_rf_model
-    target_names = breast_cancer_data_pandas.target_names
-
+    
     # Verify output shape of model
     logger.debug(f'Model probability prediction:\n{model.predict_proba(x_test)}')   
 
@@ -36,10 +34,10 @@ def test_bat(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
     t1 = perf_counter()
 
     logger.info('Creating class instance')
-    explain = BornAgain()
+    explain = born_again_tree(max_attempts=10)
 
     logger.info('Fitting tree')
-    oracle = lambda x: pd.DataFrame(model.predict_proba(x), columns=target_names)
+    oracle = model.predict_proba
     explain.fit(x_train, oracle)
 
     t2 = perf_counter()
