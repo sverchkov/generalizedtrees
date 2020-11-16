@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.abc import Collection, Iterator
+from collections.abc import Collection
 from collections import deque
-from typing import Iterable, Any, List, NamedTuple, Union
+from typing import Iterable, Any
 from logging import getLogger
 
 logger = getLogger()

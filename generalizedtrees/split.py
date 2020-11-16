@@ -16,14 +16,13 @@
 
 from abc import abstractmethod
 from logging import getLogger
-from typing import Container, Iterable, Protocol, Optional
+from typing import Collection, Container, Iterable, Protocol, Optional
 from functools import cached_property
 from operator import itemgetter
 
 import numpy as np
 
-from generalizedtrees.base import SplitTest
-from generalizedtrees.constraints import LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
+from generalizedtrees.constraints import Constraint, LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.givens import GivensLC
 from generalizedtrees import scores
@@ -33,6 +32,27 @@ logger = getLogger()
 #################
 # Split classes #
 #################
+
+# Interface definition
+class SplitTest(Protocol):
+    """
+    Base abstract class for splits.
+
+    A split is defined as a test with integer outcomes and a set of constraints each of which
+    corresponds to an outcome of the test.
+    """
+
+    @abstractmethod
+    def pick_branches(self, data_frame: np.ndarray):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def constraints(self) -> Collection[Constraint]:
+        raise NotImplementedError
+
+
+# Implementations
 
 class SplitGT(SplitTest):
 

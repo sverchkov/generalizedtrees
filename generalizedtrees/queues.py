@@ -14,17 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar
 from abc import abstractmethod
 from heapq import heappush, heappop
 from collections import deque
 
 T = TypeVar('T')
 
-class CanPushPop(Protocol[T]): # TODO: Name better.
+class CanPushPop(Protocol, Generic[T]):
 
     @abstractmethod
-    def push(self, item: T):
+    def push(self, item: T) -> None:
         raise NotImplementedError
 
     @abstractmethod

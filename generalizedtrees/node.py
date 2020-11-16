@@ -19,10 +19,11 @@ from typing import Protocol, Optional, Tuple
 
 import numpy as np
 
-from generalizedtrees.base import SplitTest, order_by
 from generalizedtrees.constraints import Constraint
 from generalizedtrees.generate import DataFactoryLC
 from generalizedtrees.leaves import LocalEstimator
+from generalizedtrees.split import SplitTest
+from generalizedtrees.util import order_by
 
 
 # Interface definition:

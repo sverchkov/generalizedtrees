@@ -17,7 +17,6 @@
 from abc import abstractmethod
 from generalizedtrees.generate import DataFactoryLC
 
-from numpy.lib.arraysetops import unique
 from generalizedtrees.givens import DataWithOracleGivensLC, GivensLC, SupervisedDataGivensLC
 from generalizedtrees.leaves import LocalEstimator
 
@@ -196,7 +195,7 @@ class GreedyBuilderLC:
     global_stop: GlobalStopLC = NeverStopLC()
     local_stop: LocalStopLC = NeverStopLC()
 
-    def build_tree(self):
+    def build_tree(self) -> Tree:
 
         root = self.node_builder.create_root()
         tree = Tree([root])
@@ -219,5 +218,5 @@ class GreedyBuilderLC:
         
         return tree
     
-    def prune_tree(self, tree):
+    def prune_tree(self, tree: Tree):
         return tree

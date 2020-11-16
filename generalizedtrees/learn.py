@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from generalizedtrees.split import SplitCandidateGeneratorLC, SplitScoreLC
-from generalizedtrees.stop import GlobalStopLC, LocalStopLC, NeverStopLC
+from generalizedtrees.stop import GlobalStopLC, LocalStopLC
 from generalizedtrees.queues import CanPushPop
 from typing import Callable
 import numpy as np

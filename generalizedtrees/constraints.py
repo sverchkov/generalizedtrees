@@ -14,9 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, Protocol, NamedTuple, Any, Union, runtime_checkable, Dict, Set
-from collections import defaultdict
-from abc import ABC, abstractmethod
+from typing import Iterable, Protocol, NamedTuple, Any, Union, runtime_checkable
+from abc import abstractmethod
 from enum import Enum, Flag, auto
 import numpy as np
 

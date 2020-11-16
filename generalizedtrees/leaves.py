@@ -18,7 +18,6 @@ import numpy as np
 from typing import Any, Protocol
 
 
-
 class LocalEstimator(Protocol):
 
     def fit(self, x, y, **kwargs) -> 'LocalEstimator':
@@ -84,20 +83,3 @@ class SKProbaClassifier(LocalEstimator):
 
     def estimate(self, data_matrix: np.ndarray) -> np.ndarray:
         return self.classifier.predict_proba(data_matrix)
-
-
-# Should be obsolete
-class BinSKProbaEstimator(LocalEstimator):
-    """
-    Wrapper around an sklearn classifier, uses the predict_proba method, outputs p(target=1).
-    """
-
-    def __init__(self, classifier):
-        self.classifier = classifier
-    
-    def fit(self, x, y, **kwargs):
-        self.classifier.fit(x, y, **kwargs)
-        return self
-
-    def estimate(self, data_matrix: np.ndarray) -> np.ndarray:
-        return self.classifier.predict_proba(data_matrix)[:,[1]]
