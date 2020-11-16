@@ -15,7 +15,8 @@
 # limitations under the License.
 
 import numpy as np
-from typing import Protocol
+from typing import Any, Protocol
+
 
 
 class LocalEstimator(Protocol):
@@ -58,8 +59,11 @@ class SKProbaClassifier(LocalEstimator):
     Wrapper around an sklearn classifier.
     
     To predict, uses the predict_proba method.
-    To fit, converts the y matrix to a label vectors, selecting the maximal component for each instance. 
+    To fit, converts the y matrix to a label vectors, selecting the maximal component for each instance.
     """
+
+    classifier: Any # Use monkey-typing
+    fallback: bool = True # Whether to fall back to constant estimator when fitting data with one class.
 
     def __init__(self, classifier):
         self.classifier = classifier
@@ -71,6 +75,9 @@ class SKProbaClassifier(LocalEstimator):
 
         # Convert y matrix to label vector
         targets = y.argmax(axis=1)
+
+        if self.fallback and len(np.unique(targets)) < 2:
+            return ConstantEstimator().fit(y)
 
         self.classifier.fit(x, targets, **kwargs)
         return self

@@ -77,8 +77,7 @@ class SupervisedNodeBuilderLC(NodeBuilderLC[Node]):
         node = self.node_type()
         node.data = self.data
         node.y = self.y
-        node.model = self.new_model()
-        node.model.fit(node.data, node.y)
+        node.model = self.new_model().fit(node.data, node.y)
         return node
     
     def generate_children(self, node: Node) -> Iterable[Node]:
@@ -92,8 +91,7 @@ class SupervisedNodeBuilderLC(NodeBuilderLC[Node]):
                 child = self.node_type()
                 child.data = node.data[idx, :]
                 child.y = node.y[idx, :]
-                child.model = self.new_model()
-                child.model.fit(child.data, child.y)
+                child.model = self.new_model().fit(child.data, child.y)
                 child.local_constraint = c
                 yield child
               
@@ -143,8 +141,7 @@ class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
 
         node.y = self.oracle(node.data)
 
-        node.model = self.new_model()
-        node.model.fit(node.data, node.y)
+        node.model = self.new_model().fit(node.data, node.y)
 
         node.constraints = ()
 
@@ -172,8 +169,7 @@ class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
                 child.data = np.row_stack((pregen_data, gen_data))
                 child.y = np.row_stack((node.y[idx, :], gen_y))
 
-                child.model = self.new_model()
-                child.model.fit(child.data, child.y)
+                child.model = self.new_model().fit(child.data, child.y)
 
                 child.local_constraint = c
                 child.constraints = node.constraints + (c,)
