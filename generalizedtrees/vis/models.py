@@ -19,7 +19,7 @@ from typing import Union
 from numpy import generic, ndarray, concatenate, array
 from logging import getLogger
 
-from generalizedtrees.leaves import ConstantEstimator, SKProbaEstimator, BinSKProbaEstimator
+from generalizedtrees.leaves import ConstantEstimator, SKProbaClassifier, BinSKProbaEstimator
 
 logger = getLogger()
 
@@ -33,7 +33,7 @@ def model_to_simplified(model, explanation):
     if isinstance(model, ConstantEstimator):
         return _constant_estimator_to_simplified(model, explanation)
     
-    if isinstance(model, (SKProbaEstimator, BinSKProbaEstimator)):
+    if isinstance(model, (SKProbaClassifier, BinSKProbaEstimator)):
         if hasattr(model.classifier, 'intercept_') and hasattr(model.classifier, 'coef_'):
             return _skl_linear_estimator_to_simplified(model, explanation)
     
@@ -66,7 +66,7 @@ def _constant_estimator_to_simplified(model: ConstantEstimator, explanation):
         for i in range(len(explanation.target_names))]}
 
 def _skl_linear_estimator_to_simplified(
-    model: Union[SKProbaEstimator, BinSKProbaEstimator],
+    model: Union[SKProbaClassifier, BinSKProbaEstimator],
     explanation,
     epsilon=1E-6
     ):

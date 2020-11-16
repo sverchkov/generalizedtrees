@@ -53,22 +53,33 @@ class ConstantEstimator(LocalEstimator):
         return str(self.est_vector)
 
 
-class SKProbaEstimator(LocalEstimator):
+class SKProbaClassifier(LocalEstimator):
     """
-    Wrapper around an sklearn classifier, uses the predict_proba method.
+    Wrapper around an sklearn classifier.
+    
+    To predict, uses the predict_proba method.
+    To fit, converts the y matrix to a label vectors, selecting the maximal component for each instance. 
     """
 
     def __init__(self, classifier):
         self.classifier = classifier
     
-    def fit(self, x, y, **kwargs):
-        self.classifier.fit(x, y, **kwargs)
+    def fit(self, x: np.ndarray, y: np.ndarray, **kwargs):
+
+        # Record number of classes
+        self.classifier.classes_ = np.arange(y.shape[1])
+
+        # Convert y matrix to label vector
+        targets = y.argmax(axis=1)
+
+        self.classifier.fit(x, targets, **kwargs)
         return self
 
     def estimate(self, data_matrix: np.ndarray) -> np.ndarray:
         return self.classifier.predict_proba(data_matrix)
 
 
+# Should be obsolete
 class BinSKProbaEstimator(LocalEstimator):
     """
     Wrapper around an sklearn classifier, uses the predict_proba method, outputs p(target=1).

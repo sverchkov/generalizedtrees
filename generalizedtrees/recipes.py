@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from sklearn.linear_model import LogisticRegression
 
 from generalizedtrees.node import TrepanNode
 from generalizedtrees.generate import TrepanDataFactoryLC
-from generalizedtrees.leaves import ConstantEstimator
+from generalizedtrees.leaves import ConstantEstimator, SKProbaClassifier
 from generalizedtrees.grow import ModelTranslationNodeBuilderLC, SupervisedNodeBuilderLC
 from generalizedtrees.stop import GlobalStopTreeSizeLC, LocalStopDepthLC
-from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC, ProbabilityImpurityLC
+from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC, IJCAI19LRGradientScoreLC, ProbabilityImpurityLC
 from generalizedtrees.queues import Heap, Queue
 from generalizedtrees.predict import BinaryClassifierLC, ClassifierLC
 from generalizedtrees.givens import DataWithOracleGivensLC, SupervisedDataGivensLC
@@ -55,7 +56,7 @@ def decision_tree_classifier(max_depth: int, impurity = 'entropy') -> GreedyTree
     return learner
 
 
-def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0.05, max_attempts = 1000):
+def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0.05, max_attempts = 1000) -> GreedyTreeLearner:
 
     learner = GreedyTreeLearner()
     learner.givens = DataWithOracleGivensLC()
@@ -72,30 +73,47 @@ def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0
 
     return learner
 
-# Version of Trepan that uses hard target estimation for split scoring
-# TrepanV1 = greedy_classification_tree_learner(
-#     name="Trepan",
-#     parameters=[
-#         ('use_m_of_n', bool, field(default=False)),
-#         ('max_tree_size', int, field(default=20)),
-#         ('min_samples', int, field(default=100)),
-#         ('dist_test_alpha', float, field(default=0.05))
-#     ],
-#     fitter=fit_with_data_and_oracle,
-#     node_building=nb.OGCferNodeBuilderMixin,
-#     split_candidate_generator=make_split_candidates,
-#     split_score=information_gain,
-#     data_generator=trepan_generator,
-#     queue=Heap,
-#     global_stop=tree_size_limit,
-#     local_stop=never,
-#     use_proba=False
-# )
 
-# # Version of Trepan that uses target probability estimates for split scoring
-# Trepan = greedy_classification_tree_learner(
-#     name="Trepan",
+# This recipe also serves as an illustration of how one can start with an existing recipe and modify select elements.
+def trepan_logistic(
+    max_tree_size: int = 20,
+    min_samples: int = 1000,
+    dist_test_alpha = 0.05,
+    regularization_C = 0.1,
+    criterion = 'entropy',
+    max_attempts = 1000) -> GreedyTreeLearner:
+
+    # Reuse simple trepan recipe
+    learner = trepan(
+        max_tree_size=max_tree_size,
+        min_samples=min_samples,
+        dist_test_alpha=dist_test_alpha,
+        max_attempts=max_attempts)
+
+    # Substitute a logistic learner as the leaf model
+    learner.node_builder.new_model = lambda: SKProbaClassifier(
+        LogisticRegression(
+            penalty = 'l1',
+            C = regularization_C,
+            solver = 'saga',
+            max_iter = 1000
+        )
+    )
+
+    # Substitute alternate criterion if needed
+    if criterion == 'gini':
+        learner.split_score = ProbabilityImpurityLC('gini')
+    elif criterion == 'ijcai2019':
+        learner.split_score = IJCAI19LRGradientScoreLC()
+
+    return learner
+
+
+# # Trepan with logistic regression leaves
+# TLL = greedy_classification_tree_learner(
+#         name="TLL",
 #     parameters=[
+#         ('node_cls', type, field(default=nb.TLLNode)),
 #         ('use_m_of_n', bool, field(default=False)),
 #         ('max_tree_size', int, field(default=20)),
 #         ('min_samples', int, field(default=100)),
@@ -130,26 +148,7 @@ def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0
 #     use_proba=True
 # )
 
-# # Trepan with logistic regression leaves
-# TLL = greedy_classification_tree_learner(
-#         name="TLL",
-#     parameters=[
-#         ('node_cls', type, field(default=nb.TLLNode)),
-#         ('use_m_of_n', bool, field(default=False)),
-#         ('max_tree_size', int, field(default=20)),
-#         ('min_samples', int, field(default=100)),
-#         ('dist_test_alpha', float, field(default=0.05))
-#     ],
-#     fitter=fit_with_data_and_oracle,
-#     node_building=nb.OGCferNodeBuilderMixin,
-#     split_candidate_generator=make_split_candidates_p,
-#     split_score=information_gain_p,
-#     data_generator=trepan_generator_n,
-#     queue=Heap,
-#     global_stop=tree_size_limit,
-#     local_stop=never,
-#     use_proba=True
-# )
+
 
 # # Trepan with logistic regression leaves
 # TLL2 = greedy_classification_tree_learner(

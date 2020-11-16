@@ -135,7 +135,8 @@ class TrepanDataFactoryLC(DataFactoryLC):
 
     def refit(self, data_matrix: np.ndarray) -> 'DataFactoryLC':
 
-        if (self.data_matrix is not None and
+        if len(data_matrix) < 1 or (
+            self.data_matrix is not None and
             same_distribution(data_matrix, self.data_matrix, feature_spec=self.feature_spec, alpha = self.alpha)
         ):
             return self
