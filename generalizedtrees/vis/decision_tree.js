@@ -1,3 +1,9 @@
+/* Template for visualizing generalized decitsion trees
+
+Licensed under the BSD 3-Clause License
+Copyright (c) 2020, Yuriy Sverchkov
+*/
+
 // Global settings
 const width = 954;
 const node_width = 100;
