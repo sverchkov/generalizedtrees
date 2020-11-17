@@ -84,7 +84,7 @@ class SplitGT(SplitTest):
             feature = f'x[{self.feature}]'
         else:
             feature = self.feature_name
-        return f'Test {feature} > {self.value}'
+        return f'Test {feature} > {self.value:.5g}'
 
 
 class SplitOneVsAll(SplitTest):

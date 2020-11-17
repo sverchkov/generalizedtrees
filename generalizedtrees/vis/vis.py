@@ -54,7 +54,7 @@ def _frankenstein(data_str, artist_str, template_str, out_file):
 
 def _get_constraint_type_as_html_string(constraint):
     if isinstance(constraint, cons.SimpleConstraint):
-        return f'{constraint.operator.value} {constraint.value}'
+        return f'{constraint.operator.value} {constraint.value:.5g}'
     # Fall through catch-all
     return str(constraint)
 
@@ -80,15 +80,21 @@ def explanation_to_simplified(explanation, feature_annotations = None):
         out_node, in_node = stack.pop()
 
         # Record training set counts (and target distributions)
-        if hasattr(in_node.item, 'training_target_proba'):
+        if hasattr(in_node.item, 'y'):
+            if hasattr(in_node.item, 'n_training'):
+                y_train = in_node.item.y[0:in_node.item.n_training]
+                y_gen = in_node.item.y[in_node.item.n_training:]
+
+                out_node['generated_samples'] = [
+                    {'label': str(k), 'count': int(v)} for v, k in
+                    zip(y_gen.sum(axis=0), explanation.target_names)]
+            else:
+                y_train = in_node.item.y
+
             out_node['training_samples'] = [
                 {'label':str(k), 'count': int(v)} for v, k in
-                zip(in_node.item.training_target_proba.sum(axis=0), explanation.classes_)]
+                zip(y_train.sum(axis=0), explanation.target_names)]
 
-        if hasattr(in_node.item, 'gen_target_proba'):
-            out_node['generated_samples'] = [
-                {'label': str(k), 'count': int(v)} for v, k in
-                zip(in_node.item.gen_target_proba.sum(axis=0), explanation.classes_)]
 
         # Record split
         if hasattr(in_node.item, 'split') and in_node.item.split is not None:
