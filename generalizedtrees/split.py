@@ -51,8 +51,8 @@ class SplitGT(SplitTest):
         self.value = value
     
     def pick_branches(self, data_matrix):
+        v = data_matrix[:, self.feature]
         try:
-            v = data_matrix[:, self.feature]
             return (v > self.value).astype(np.intp)
         except:
             logger.fatal(

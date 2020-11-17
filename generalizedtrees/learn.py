@@ -3,17 +3,23 @@
 # Licensed under the BSD 3-Clause License
 # Copyright (c) 2020, Yuriy Sverchkov
 
-from generalizedtrees.split import SplitCandidateGeneratorLC, SplitScoreLC
-from generalizedtrees.stop import GlobalStopLC, LocalStopLC
-from generalizedtrees.queues import CanPushPop
 from typing import Callable
+from logging import getLogger
+
 import numpy as np
 from pandas import DataFrame
 
-from generalizedtrees.tree import Tree, tree_to_str
-from generalizedtrees.predict import PredictorLC
 from generalizedtrees.givens import GivensLC
 from generalizedtrees.grow import GreedyBuilderLC, NodeBuilderLC
+from generalizedtrees.predict import PredictorLC
+from generalizedtrees.queues import CanPushPop
+from generalizedtrees.split import SplitCandidateGeneratorLC, SplitScoreLC
+from generalizedtrees.stop import GlobalStopLC, LocalStopLC
+from generalizedtrees.tree import Tree, tree_to_str
+
+
+logger = getLogger()
+
 
 class GreedyTreeLearner:
 

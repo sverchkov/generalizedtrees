@@ -35,10 +35,12 @@ Install it with::
 Dependencies
 ============
 * Python (>=3.8)
-* scikit-learn
-* NumPy
-* SciPy
-* Pandas
+* scikit-learn (>=0.23.2)
+* numpy (>=1.19.1)
+* scipy (>=1.5.2)
+* pandas (>=1.1.0)
+
+See requirements.txt for recommended dependencies (usually newest versions of all packages).
 
 Development
 ===========
@@ -51,7 +53,7 @@ Building
 We use the standard Python process for building the package.
 Run::
 
-    python setup.py building
+    python setup.py build
 
 to locally build the package, and::
 

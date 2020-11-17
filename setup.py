@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import generalizedtrees
 from setuptools import setup, find_packages
-
 
 with open("README.rst", "r") as fh:
     long_description = fh.read()
@@ -25,13 +25,13 @@ with open("oldest") as fh:
 
 setup(
     name="generalizedtrees",
-    version="1.0.0",
+    version=generalizedtrees.__version__,
     author="Yuriy Sverchkov",
     author_email="yuriy.sverchkov@wisc.edu",
     description="Library for tree models: decision trees, model trees, mimic models, etc.",
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    license="Apache 2",
+    license="BSD (3 clause)",
     keywords="machine learning decision trees model",
     url="https://github.com/Craven-Biostat-Lab/generalizedtrees",
     packages=find_packages(exclude=['*.tests']),
@@ -39,8 +39,8 @@ setup(
     install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: Apache Software License",
-        "Development Status :: 1 - Planning",
+        "License :: OSI Approved :: BSD License",
+        "Development Status :: 2 - Pre-Alpha",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering",
     ],
