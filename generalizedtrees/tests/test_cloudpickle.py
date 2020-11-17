@@ -28,7 +28,7 @@ def test_trepan_cloudpickle_serialization(breast_cancer_data_pandas, breast_canc
 
     # Learn explanation
     logger.info('Creating class instance')
-    trepan = trepan(max_attempts=3)
+    trepan = trepan(max_tree_size=5, max_attempts=3)
 
     logger.info('Fitting tree')
     oracle = lambda x: model.predict_proba(x)

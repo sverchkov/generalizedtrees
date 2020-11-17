@@ -26,7 +26,7 @@ def test_tll_entropy(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
     t1 = perf_counter()
 
     logger.info('Creating class instance')
-    explain = trepan_logistic(max_attempts=3)
+    explain = trepan_logistic(max_tree_size = 5, max_attempts=3)
 
     logger.info('Fitting tree')
     oracle = model.predict_proba
@@ -75,7 +75,7 @@ def test_tll_ijcai2019(breast_cancer_data_pandas, breast_cancer_rf_model, caplog
     t1 = perf_counter()
 
     logger.info('Creating class instance')
-    explain = trepan_logistic(criterion='ijcai2019', max_attempts=3)
+    explain = trepan_logistic(max_tree_size = 5, criterion='ijcai2019', max_attempts=3)
 
     logger.info('Fitting tree')
     oracle = model.predict_proba

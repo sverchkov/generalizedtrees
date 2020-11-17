@@ -26,7 +26,7 @@ def test_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
     t1 = perf_counter()
 
     logger.info("Creating class instance")
-    trepan = trepan(max_attempts=3)
+    trepan = trepan(max_tree_size = 5, max_attempts=3)
 
     logger.info("Fitting tree")
     trepan.fit(x_train, model.predict_proba, feature_spec = (FeatureSpec.CONTINUOUS,)*d)
@@ -67,7 +67,7 @@ def test_trepan_pandas(breast_cancer_data_pandas, breast_cancer_rf_model, caplog
     t1 = perf_counter()
 
     logger.info('Creating class instance')
-    trepan = trepan(max_attempts=3)
+    trepan = trepan(max_tree_size = 5, max_attempts=3)
 
     logger.info('Fitting tree')
     oracle = lambda x: model.predict_proba(x)

@@ -43,13 +43,10 @@ def test_dtc_serialization(breast_cancer_data, caplog):
     logger.info("Done")
 
 
-@pytest.mark.skip(reason="Current Trepan uses lambdas which are not picklable")
 def test_trepan_serialization(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
 
     import logging
-    from generalizedtrees.recipes import Trepan
-    import pandas as pd
-    from generalizedtrees.tree import tree_to_str
+    from generalizedtrees.recipes import trepan
     from pickle import dumps, loads
     
     logger = logging.getLogger()
@@ -58,26 +55,26 @@ def test_trepan_serialization(breast_cancer_data_pandas, breast_cancer_rf_model,
     x_train = breast_cancer_data_pandas.x_train
     x_test = breast_cancer_data_pandas.x_test
     model = breast_cancer_rf_model
-    target_names = breast_cancer_data_pandas.target_names
 
     # Learn explanation
     logger.info('Creating class instance')
-    trepan = Trepan()
+    trepan = trepan(max_tree_size = 5)
 
     logger.info('Fitting tree')
-    oracle = lambda x: pd.DataFrame(model.predict_proba(x), columns=target_names)
+    oracle = model.predict_proba
     trepan.fit(x_train, oracle)
 
     tree_str = trepan.show_tree()
     logger.info(f'Learned tree:\n{tree_str}')
 
     logger.info('Pickling tree')
-    bytes_obj = dumps(trepan.tree)
+    bytes_obj = dumps(trepan)
 
     logger.info('Unpickling tree')
     returned_tree = loads(bytes_obj)
 
-    returned_tree_str = tree_to_str(returned_tree)
+    returned_tree_str = returned_tree.show_tree()
+
     logger.info(f'Unpickled tree:\n{returned_tree_str}')
 
     assert returned_tree_str == tree_str

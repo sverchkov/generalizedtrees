@@ -23,7 +23,7 @@ def test_bat(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
     t1 = perf_counter()
 
     logger.info('Creating class instance')
-    explain = born_again_tree(max_attempts=4)
+    explain = born_again_tree(max_tree_size=5, max_attempts=4)
 
     logger.info('Fitting tree')
     oracle = model.predict_proba
