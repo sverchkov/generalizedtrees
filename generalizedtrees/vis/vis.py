@@ -3,6 +3,7 @@
 # Licensed under the BSD 3-Clause License
 # Copyright (c) 2020, Yuriy Sverchkov
 
+from string import Template
 import pkgutil
 import json
 from logging import getLogger
@@ -12,33 +13,27 @@ import generalizedtrees.constraints as cons
 
 logger = getLogger()
 
-DATA_TEMPLATE_STR = '/***DATA***/'
-ARTIST_TEMPLATE_STR = '/**DRAWING SCRIPT**/'
-
 def _load_html_template():
     return pkgutil.get_data('generalizedtrees.vis', 'template.html').decode('utf-8')
+
 
 def _load_dt_js():
     return pkgutil.get_data('generalizedtrees.vis', 'decision_tree.js').decode('utf-8')
 
+
 def explanation_to_html(explanation, out_file, feature_annotations = None):
 
-    json_str = explanation_to_JSON(explanation, feature_annotations)
     # We anticipate possibly using different templates depending on model type
-    html_template = _load_html_template()
-    dt_artist = _load_dt_js()
+    html_str = Template(_load_html_template()).substitute({
+        'data': explanation_to_JSON(explanation, feature_annotations),
+        'artist': _load_dt_js()
+    })
 
     if hasattr(out_file, 'write'):
-        _frankenstein(json_str, dt_artist, html_template, out_file)
+        out_file.write(html_str)
     else:
         with open(out_file, 'wt') as f:
-            _frankenstein(json_str, dt_artist, html_template, f)
-
-def _frankenstein(data_str, artist_str, template_str, out_file):
-    
-    out_file.write(template_str
-        .replace(DATA_TEMPLATE_STR, 'data = ' + data_str + ';')
-        .replace(ARTIST_TEMPLATE_STR, artist_str))
+            f.write(html_str)
 
 
 def _get_constraint_type_as_html_string(constraint):
