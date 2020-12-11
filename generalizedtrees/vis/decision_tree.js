@@ -128,31 +128,153 @@ function draw_tree(data){
         .attr("font-family", "sans-serif")
         .attr("font-size", 10)
         .attr("transform", `translate(${0},${0})`);
+
+    // Links are relevant only if data has children
+    if (data.children) {
+    
+        // Draw link core
+        const link = g.append("g")
+            .attr("fill", "none")
+            .attr("stroke", "black")
+            .attr("stroke-opacity", 0.4)
+            .attr("stroke-dasharray", ("5,3"))
+            .attr("stroke-width", 0.5)
+            .selectAll("path")
+            .data(root.links())
+            .join("path")
+            .attr("d", d3.linkVertical()
+                .x(d => d.x)
+                .y(d => d.y));
         
-    const link = g.append("g")
-        .attr("fill", "none")
-        .attr("stroke", "#555")
-        .attr("stroke-opacity", 0.4)
-        .attr("stroke-width", 1.5)
-        .selectAll("path")
-        .data(root.links())
-        .join("path")
-        .attr("d", d3.linkVertical()
-            .x(d => d.x)
-            .y(d => d.y));
-    
-    const linkLabel = g.append("g")
-        .selectAll("text")
-        .data(root.links())
-        .join("text")
-        .attr("dy", "0.31em")
-        .attr("x", d => (d.source.x + d.target.x) / 2)
-        .attr("y", d => (d.source.y + d.target.y) / 2)
-        .attr("text-anchor", "middle")
-        .text(d => d.target.data.branch)
-        .clone(true).lower()
-        .attr("stroke", "white");
-    
+        // Draw sample flow.
+        // Total link width is limited by node width
+        total_samples = 0
+        // Hacky, to fix later
+        targets = []
+        data.children.forEach(function(child){
+            if (child.training_samples) data.training_samples.forEach(function(label){
+                total_samples += label.count;
+                if (!targets.includes(label.label)) targets.push(label.label)
+            })
+            if (child.generated_samples) data.generated_samples.forEach(function(label){
+                total_samples += label.count;
+                if (!targets.includes(label.label)) targets.push(label.label)
+            })
+        })
+        sample_scale = node_width / total_samples;
+
+        // Link drawing is:
+        // [dashed boundary, space
+        // for k: training label k, space,
+        // for k: generated label k, space
+        // .. dashed boundary]
+        const trace_generated = false;
+        cosmetic_links = [];
+        
+        root.descendants().forEach(tree_node => {
+            if (tree_node.children){
+                let links = [];
+                let source_offset = 0;
+                //let source_counts = {'training': {}, 'generated': {}};
+                //let children_counts = [];
+                tree_node.children.forEach(child => {
+                    let target_offset = 0;
+                    let child_links = [];
+                    if (child.data.training_samples)
+                        child.data.training_samples.forEach(entry => {
+                            let hw = entry.count * sample_scale / 2;
+                            target_offset += hw;
+                            source_offset += hw;
+                            this_link = {
+                                'label': entry.label,
+                                'type': 'training',
+                                'count': entry.count,
+                                'width': entry.count * sample_scale,
+                                'source': {
+                                    'center_x': tree_node.x,
+                                    'y': tree_node.y,
+                                    'offset': source_offset
+                                },
+                                'target': {
+                                    'center_x': child.x,
+                                    'y': child.y,
+                                    'offset': target_offset
+                                }
+                            }
+                            cosmetic_links.push(this_link),
+                            links.push(this_link)
+                            child_links.push(this_link)
+                            target_offset += hw + 1;
+                            source_offset += hw + 1;
+                        });
+                    if (child.data.generated_samples && trace_generated)
+                        child.data.generated_samples.forEach(entry => {
+                            let hw = entry.count * sample_scale / 2;
+                            target_offset += hw;
+                            source_offset += hw;
+                            this_link = {
+                                'label': entry.label,
+                                'type': 'generated',
+                                'count': entry.count,
+                                'width': entry.count * sample_scale,
+                                'source': {
+                                    'center_x': tree_node.x,
+                                    'y': tree_node.y,
+                                    'offset': source_offset
+                                },
+                                'target': {
+                                    'center_x': child.x,
+                                    'y': child.y,
+                                    'offset': target_offset
+                                }
+                            }
+                            cosmetic_links.push(this_link),
+                            links.push(this_link)
+                            child_links.push(this_link)
+                            target_offset += hw + 1;
+                            source_offset += hw + 1;
+                        });
+                    // Properly center links on target end
+                    // Target width is target_offset
+                    child_links.forEach(ln =>
+                        ln.target.x = ln.target.center_x - target_offset / 2 + ln.target.offset)
+                })
+
+                // Properly center links on target end
+                // Source width is source_offset
+                links.forEach(ln =>
+                    ln.source.x = ln.source.center_x - source_offset / 2 + ln.source.offset)
+            }
+        })
+
+        // Draw bands
+        g.append("g")
+            .attr("fill", "none")
+            .attr("stroke", "#555")
+            .attr("stroke-opacity", 0.7)
+            //.attr("stroke-dasharray", ("5,3"))
+            .selectAll("path")
+            .data(cosmetic_links)
+            .join("path")
+            .attr("stroke-width", d => d.width)
+            .attr("d", d3.linkVertical()
+                .x(d => d.x)
+                .y(d => d.y));
+        
+        // Draw labels
+        const linkLabel = g.append("g")
+            .selectAll("text")
+            .data(root.links())
+            .join("text")
+            .attr("dy", "0.31em")
+            .attr("x", d => (d.source.x + d.target.x) / 2)
+            .attr("y", d => (d.source.y + d.target.y) / 2)
+            .attr("text-anchor", "middle")
+            .text(d => d.target.data.branch)
+            .clone(true).lower()
+            .attr("stroke", "white");
+    }
+
     const node = g.append("g")
         .attr("stroke-linejoin", "round")
         .attr("stroke-width", 3)
