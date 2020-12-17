@@ -10,6 +10,7 @@ from logging import getLogger
 from generalizedtrees.queues import Stack
 from generalizedtrees.vis.models import model_to_simplified
 import generalizedtrees.constraints as cons
+from generalizedtrees.vis.util import _ensure_native
 
 logger = getLogger()
 
@@ -59,7 +60,7 @@ def explanation_to_simplified(explanation, feature_annotations = None):
     stack = Stack()
     stack.push((root, explanation.tree.node('root')))
 
-    while (stack):
+    while stack:
 
         out_node, in_node = stack.pop()
 
@@ -88,9 +89,12 @@ def explanation_to_simplified(explanation, feature_annotations = None):
                 try:
                     f = in_node.item.split.feature
                     annotation = feature_annotations.loc[f]
-                    out_node['feature_annotation'] = [{'annotation': 'feature id', 'value': f}]
+                    out_node['feature_annotation'] = [{
+                        'annotation': 'feature id',
+                        'value': _ensure_native(f)}]
                     out_node['feature_annotation'].extend([
-                        {'annotation': str(i), 'value': v} for i, v in annotation.iteritems()])
+                        {'annotation': str(i), 'value': _ensure_native(v)}
+                        for i, v in annotation.iteritems()])
                 
                 except Exception as e:
                     logger.warning(

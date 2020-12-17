@@ -5,10 +5,11 @@
 
 from typing import Union
 
-from numpy import generic, ndarray, concatenate, array
+from numpy import concatenate, array
 from logging import getLogger
 
 from generalizedtrees.leaves import ConstantEstimator, SKProbaClassifier
+from generalizedtrees.vis.util import _ensure_native
 
 logger = getLogger()
 
@@ -28,13 +29,6 @@ def model_to_simplified(model, explanation):
     
     # Fall through default
     return str(model)
-
-def _ensure_native(scalar):
-    if isinstance(scalar, ndarray):
-        assert len(scalar) == 1
-        scalar = scalar[0]
-    if isinstance(scalar, generic): return scalar.item()
-    return scalar
 
 def _constant_estimator_to_simplified(model: ConstantEstimator, explanation):
 
