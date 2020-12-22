@@ -369,6 +369,9 @@ class SplitConstructorLC:
 
     split_generator: SplitCandidateGeneratorLC
     split_scorer: SplitScoreLC
+    only_use_training_to_generate: bool = False
+    only_use_training_to_score: bool = False
+    infimum_score_to_split: float = 0
 
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
 
@@ -378,10 +381,24 @@ class SplitConstructorLC:
         if y is None:
             y = node.y
         
+        if self.only_use_training_to_generate:
+            g_data = data[:node.n_training, :]
+            g_y = y[:node.n_training, :]
+        else:
+            g_data = data
+            g_y = y
+        
+        if self.only_use_training_to_score:
+            s_data = data[:node.n_training, :]
+            s_y = y[:node.n_training, :]
+        else:
+            s_data = data
+            s_y = y
+
         best_split = None
-        best_split_score = 0
-        for split in self.split_generator.genenerator(data, y):
-            new_score = self.split_scorer.score(node, split, data, y)
+        best_split_score = self.infimum_score_to_split
+        for split in self.split_generator.genenerator(g_data, g_y):
+            new_score = self.split_scorer.score(node, split, s_data, s_y)
             if new_score > best_split_score:
                 best_split_score = new_score
                 best_split = split
