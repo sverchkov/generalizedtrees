@@ -63,6 +63,7 @@ def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0
     """
 
     learner = GreedyTreeLearner()
+    learner.builder.splitter.only_use_training_to_generate = True
     learner.givens = DataWithOracleGivensLC()
     learner.predictor = ClassifierLC()
     learner.queue = Heap

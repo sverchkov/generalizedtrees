@@ -180,9 +180,12 @@ class GreedyBuilderLC:
 
     new_queue: Callable[..., CanPushPop]
     node_builder: NodeBuilderLC
-    splitter: SplitConstructorLC = SplitConstructorLC()
+    splitter: SplitConstructorLC
     global_stop: GlobalStopLC = NeverStopLC()
     local_stop: LocalStopLC = NeverStopLC()
+
+    def __init__(self):
+        self.splitter = SplitConstructorLC()
 
     def build_tree(self) -> Tree:
 

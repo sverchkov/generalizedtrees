@@ -28,13 +28,14 @@ class GreedyTreeLearner:
 
     # Learner components
     givens: GivensLC
-    builder: GreedyBuilderLC = GreedyBuilderLC()
+    builder: GreedyBuilderLC
     predictor: PredictorLC
     
     # TODO?
-    #def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # TODO: Validation
         # TODO: Set components from input
+        self.builder = GreedyBuilderLC()
 
     # Component setters for components that aren't direct attributes
 
