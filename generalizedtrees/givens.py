@@ -122,8 +122,15 @@ class DataWithOracleGivensLC(GivensLC):
             feature_spec=kwargs.get('feature_spec')
         )
 
-        # Todo: some sort of validation
-        self.oracle = oracle
+        # Infer correct oracle
+        if hasattr(oracle, 'predict') and hasattr(oracle, 'classes_'):
+            logger.info(
+                'Inferring that oracle is a Scikit-Learn-like classifier '
+                'and using the "predict" method.')
+            self.oracle = lambda x: np.eye(len(oracle.classes_))[oracle.predict(x),]
+        else:
+            logger.info('Treating oracle as a function')
+            self.oracle = oracle
 
         if prelabel_data:
             targets = oracle(self.data_matrix)
