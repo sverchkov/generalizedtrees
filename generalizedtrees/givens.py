@@ -5,10 +5,13 @@
 
 from abc import abstractmethod
 from typing import Callable, Optional, Tuple, Protocol
+from logging import getLogger
 
-from generalizedtrees.features import FeatureSpec, infer_feature_spec
 import pandas as pd
 import numpy as np
+from generalizedtrees.features import FeatureSpec, infer_feature_spec
+
+logger = getLogger()
 
 # Givens Learner Component:
 
@@ -178,7 +181,8 @@ def parse_data(data, feature_names=None, feature_spec=None):
         raise ValueError(f'Could not process a {type(data)} object: {data}')
     
     if feature_spec is None:
-        raise NotImplementedError("Haven't implemented feature spec inference for this type yet")
+        logger.warning('Assuming continuous features in the absence of feature specifications')
+        feature_spec = (FeatureSpec.CONTINUOUS,) * m
 
     return (data_matrix, feature_names, feature_spec)
 
