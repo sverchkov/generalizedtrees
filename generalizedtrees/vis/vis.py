@@ -14,8 +14,8 @@ from generalizedtrees.vis.util import _ensure_native
 
 logger = getLogger()
 
-def _load_html_template():
-    return pkgutil.get_data('generalizedtrees.vis', 'template.html').decode('utf-8')
+def _load_html_template(template = 'template.html'):
+    return pkgutil.get_data('generalizedtrees.vis', template).decode('utf-8')
 
 
 def _load_dt_js():
