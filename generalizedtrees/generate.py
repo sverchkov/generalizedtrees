@@ -8,7 +8,7 @@ from abc import abstractmethod
 from logging import getLogger
 
 import numpy as np
-from scipy.stats import ks_2samp, chisquare
+from scipy.stats import ks_2samp, chi2_contingency
 
 from generalizedtrees.constraints import Constraint, test
 from generalizedtrees.features import FeatureSpec
@@ -45,10 +45,11 @@ def same_distribution(data_1, data_2, /, feature_spec, alpha):
             # If only one value is present skip this test
             if k > 1:
 
-                freq1 = [map1[v] if v in map1 else 0 for v in values]
-                freq2 = [map2[v] if v in map2 else 0 for v in values]
+                freq = [[map1[v] if v in map1 else 0 for v in values],
+                        [map2[v] if v in map2 else 0 for v in values]]
 
-                _, p = chisquare(f_obs=freq1, f_exp=freq2, ddof=k-1)
+                _, p, _, _ = chi2_contingency(observed = freq)
+
                 if p < min_p:
                     min_p = p
                 n_tests += 1
