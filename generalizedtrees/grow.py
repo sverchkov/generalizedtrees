@@ -153,7 +153,7 @@ class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
 
                 gen_data = child.data_factory.generate(self.min_samples - pregen_data.shape[0])
                 if gen_data.shape[0] < 1:
-                    gen_y = np.empty(0)
+                    gen_y = np.empty((0, node.y.shape[1]))
                 else:
                     gen_y = self.oracle(gen_data)
 
