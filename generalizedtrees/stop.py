@@ -5,9 +5,12 @@
 
 
 from abc import abstractmethod
+from logging import getLogger
 from typing import Iterable, Protocol
+
 from generalizedtrees.tree import Tree
 
+logger = getLogger()
 
 # Stopping criteria learner components:
 
@@ -108,7 +111,32 @@ class LocalStopDepthLC(LocalStopLC):
     def check(self, node):
         return node.depth >= self.depth
 
-# Todo: saturation test
+class LocalStopSaturation(LocalStopLC):
+
+    saturation: float = 1
+    training_only: bool = False
+
+    def __init__(self, saturation: float = 1, training_only: bool = False):
+        self.saturation = saturation
+        self.training_only = training_only
+
+    def check(self, node) -> bool:
+        item = node.item
+        y = item.y
+        if self.training_only:
+            if hasattr(item, 'n_training'):
+                if item.n_training <= 1:
+                    return True
+                else:
+                    y = item.y[:item.n_training, :]
+            else:
+                logger.warn(
+                    'Node saturation stopping criterion "training_only" flag is mean to be '
+                    'used with model translation, but is being used with node objects that '
+                    'do not support it.')
+
+        return y.mean(axis=0).max() < self.saturation
+
 
 
 ## Global stopping criteria

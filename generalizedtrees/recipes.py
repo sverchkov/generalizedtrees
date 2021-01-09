@@ -9,7 +9,7 @@ from generalizedtrees.node import MTNode, TrepanNode
 from generalizedtrees.generate import SmearingDataFactoryLC, TrepanDataFactoryLC
 from generalizedtrees.leaves import ConstantEstimator, SKProbaClassifier
 from generalizedtrees.grow import ModelTranslationNodeBuilderLC, SupervisedNodeBuilderLC
-from generalizedtrees.stop import GlobalStopTreeSizeLC, LocalStopDepthLC
+from generalizedtrees.stop import GlobalStopTreeSizeLC, LocalStopDepthLC, LocalStopSaturation
 from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC, IJCAI19LRGradientScoreLC, ProbabilityImpurityLC
 from generalizedtrees.queues import Heap, Queue, Stack
 from generalizedtrees.predict import BinaryClassifierLC, ClassifierLC
@@ -68,6 +68,7 @@ def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0
     learner.predictor = ClassifierLC()
     learner.queue = Heap
     learner.global_stop = GlobalStopTreeSizeLC(max_tree_size)
+    learner.local_stop = LocalStopSaturation(training_only=True)
     learner.split_score = ProbabilityImpurityLC('entropy')
     learner.split_generator = AxisAlignedSplitGeneratorLC()
     learner.node_builder = ModelTranslationNodeBuilderLC(
