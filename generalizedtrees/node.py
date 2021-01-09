@@ -48,7 +48,8 @@ class TrepanNode(MTNode):
     
     @cached_property
     def fidelity(self):
-        return sum((self.y * self.model.estimate(self.data)).mean(axis=0))
+        hard_estimate = np.eye(self.y.shape[1])[self.model.estimate(self.data).argmax(axis=0),:]
+        return sum((self.y * hard_estimate).mean(axis=0))
 
 
 
