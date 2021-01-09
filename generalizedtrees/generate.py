@@ -48,7 +48,7 @@ def same_distribution(data_1, data_2, /, feature_spec, alpha):
                 freq = [[map1[v] if v in map1 else 0 for v in values],
                         [map2[v] if v in map2 else 0 for v in values]]
 
-                _, p, _, _ = chi2_contingency(observed = freq)
+                _, p, _, _ = chi2_contingency(observed=freq)
 
                 if p < min_p:
                     min_p = p
