@@ -38,7 +38,7 @@ def binary_decision_tree_classifier(max_depth: int) -> GreedyTreeLearner:
     return learner
 
 
-def decision_tree_classifier(max_depth: int, impurity = 'entropy') -> GreedyTreeLearner:
+def decision_tree_classifier(max_depth: int = 20, impurity = 'entropy') -> GreedyTreeLearner:
     """
     Recipe for classification trees
     """

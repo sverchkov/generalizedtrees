@@ -10,6 +10,7 @@ def test_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
 
     from generalizedtrees.recipes import trepan
     from generalizedtrees.features import FeatureSpec
+    from generalizedtrees.split import ProbabilityImpurityLC
     from time import perf_counter
     import logging
 
@@ -26,21 +27,23 @@ def test_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
     t1 = perf_counter()
 
     logger.info("Creating class instance")
-    trepan = trepan(max_tree_size = 5, max_attempts=3)
+    explanation = trepan(max_tree_size = 5, max_attempts=3)
+    explanation.split_score = ProbabilityImpurityLC('gini')
+    explanation.builder.splitter.infimum_score_to_split = -10
 
     logger.info("Fitting tree")
-    trepan.fit(x_train, model.predict_proba, feature_spec = (FeatureSpec.CONTINUOUS,)*d)
+    explanation.fit(x_train, model.predict_proba, feature_spec = (FeatureSpec.CONTINUOUS,)*d)
 
     t2 = perf_counter()
 
     logger.info(f'Time taken: {t2-t1}')
 
-    logger.info(f'Learned tree:\n{trepan.show_tree()}')
+    logger.info(f'Learned tree:\n{explanation.show_tree()}')
 
     # Make predictions
     logger.info("Running prediction")
     #trepan_predictions =
-    trepan.predict(x_test)
+    explanation.predict(x_test)
 
     logger.info("Done")
 
