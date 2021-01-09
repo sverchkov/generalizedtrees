@@ -133,7 +133,7 @@ class DataWithOracleGivensLC(GivensLC):
             self.oracle = oracle
 
         if prelabel_data:
-            targets = oracle(self.data_matrix)
+            targets = self.oracle(self.data_matrix)
 
             # Infer target_names if not given
             if self.target_names is None:
