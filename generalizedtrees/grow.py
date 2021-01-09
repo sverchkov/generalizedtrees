@@ -165,7 +165,10 @@ class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
                 child.local_constraint = c
                 child.constraints = node.constraints + (c,)
 
-                child.coverage = node.coverage * sum(idx) / len(idx)
+                if node.n_training <= 0:
+                    child.coverage = 0
+                else:
+                    child.coverage = node.coverage * sum(idx[0:node.n_training]) / node.n_training
 
                 yield child
 

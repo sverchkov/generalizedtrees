@@ -34,7 +34,7 @@ class Node(NodeI):
 class MTNode(NodeI):
 
     n_training: int
-    coverage: float
+    coverage: float # Training set coverage
     constraints: Tuple[Constraint, ...]
     data_factory: DataFactoryLC
 
