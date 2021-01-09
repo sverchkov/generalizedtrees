@@ -8,10 +8,12 @@ from logging import getLogger
 from typing import Collection, Container, Iterable, Protocol, Optional
 from functools import cached_property
 from operator import itemgetter
+import heapq
 
 import numpy as np
+from scipy.stats import chi2_contingency
 
-from generalizedtrees.constraints import Constraint, LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
+from generalizedtrees.constraints import Constraint, MofN, LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.givens import GivensLC
 from generalizedtrees import scores
@@ -122,6 +124,11 @@ class SplitEveryValue(SplitTest):
             feature = self.feature_name
         return f'Test {feature} against each of {self.values}'
 
+
+class BinarySplit(SplitTest):
+
+    def __init__(self, constraint):
+        self.constraint = constraint
 
 ###################################
 # Base split generating functions #
@@ -362,16 +369,32 @@ class AUROCSplitScoreLC(SplitScoreLC):
 # Split Generator Learner Component #
 #####################################
 
-# Future: define protocol if we ever need to define multiple ways to do this
-
+# Interface definition:
 
 class SplitConstructorLC:
 
     split_generator: SplitCandidateGeneratorLC
     split_scorer: SplitScoreLC
-    only_use_training_to_generate: bool = False
-    only_use_training_to_score: bool = False
-    infimum_score_to_split: float = 0
+    only_use_training_to_generate: bool
+    only_use_training_to_score: bool
+    infimum_score_to_split: float
+
+    def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
+        raise NotImplementedError()
+
+# Implementations:
+
+class DefaultSplitConstructorLC(SplitConstructorLC):
+
+    def __init__(
+        self,
+        only_use_training_to_generate: bool = False,
+        only_use_training_to_score: bool = False,
+        infimum_score_to_split: float = 0
+    ) -> None:
+        self.only_use_training_to_generate = only_use_training_to_generate
+        self.only_use_training_to_score = only_use_training_to_score
+        self.infimum_score_to_split = infimum_score_to_split
 
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
 
@@ -405,3 +428,111 @@ class SplitConstructorLC:
 
         return best_split
 
+
+class MofNSplitConstructorLC(SplitConstructorLC):
+
+    beam_width: int
+    alpha: float
+
+    def __init__(
+        self,
+        beam_width = 2,
+        alpha = 0.05,
+        only_use_training_to_generate: bool = False,
+        only_use_training_to_score: bool = False,
+        infimum_score_to_split: float = 0
+    ) -> None:
+        self.beam_width = beam_width
+        self.only_use_training_to_generate = only_use_training_to_generate
+        self.only_use_training_to_score = only_use_training_to_score
+        self.infimum_score_to_split = infimum_score_to_split
+    
+    def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
+        if data is None:
+            data = node.data
+        
+        if y is None:
+            y = node.y
+        
+        if self.only_use_training_to_generate:
+            g_data = data[:node.n_training, :]
+            g_y = y[:node.n_training, :]
+        else:
+            g_data = data
+            g_y = y
+        
+        if self.only_use_training_to_score:
+            s_data = data[:node.n_training, :]
+            s_y = y[:node.n_training, :]
+        else:
+            s_data = data
+            s_y = y
+
+        candidate_splits = [self.split_generator.genenerator(g_data, g_y)]
+
+        if not candidate_splits:
+            # Unlikely that code gets here but if it does
+            return None
+
+        # Find starting point (best split)
+        best_split = None
+        best_split_score = -np.inf
+        for split in candidate_splits:
+            new_score = self.split_scorer.score(node, split, s_data, s_y)
+            if best_split is None or new_score > best_split_score:
+                best_split_score = new_score
+                best_split = split
+        
+        constraint_candidates = [constraint for split in candidate_splits for constraint in split.constraints]
+
+        # Initialize beam
+        prev_beam = []
+
+        # M-of-N beam search assumes binary splits but an n-way split could have possibly been returned,
+        # in which case the scores for binary splits corresponding to each output constraint would be different
+        # from the n-way split score.
+        if len(best_split.constraints) > 2:
+            beam = []
+            for constraint in best_split.constraints:
+                heapq.heappush(
+                    beam,
+                    (self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y), constraint))
+                while len(beam) > self.beam_width:
+                    heapq.heappop(beam)
+        else:
+            beam = [(best_split_score, constraint) for constraint in best_split.constraints]
+
+        # Beam search
+        while beam != prev_beam:
+            prev_beam = beam.copy()
+
+            # Trick to iterate over a past snapshot of the beam while modifying the real thing
+            for constraint in prev_beam:
+                for new_constraint in MofN.neighboring_tests(constraint, constraint_candidates):
+                    if self.tests_sig_diff(constraint, new_constraint, s_data, s_y):
+                        new_score = self.split_scorer.score(node, BinarySplit(new_constraint), s_data, s_y)
+
+                        if len(beam) < self.beam_width:
+                            heapq.heappush(beam, (new_score, new_constraint))
+                        else:
+                            heapq.heappushpop(beam, (new_score, new_constraint))
+            
+        # TODO: literal pruning (see pages 57-58)
+
+        return BinarySplit(max(beam)[1]) # Element 1 of the tuple is the split
+    
+
+    def tests_siog_diff(self, constraint_a, constraint_b, x, y):
+
+        # TODO: check if this test should use y-values, and if so, how?
+        #hard_y = y.argmax(axis=0)
+        a_branch = np.apply_along_axis(constraint_a.test, axis=1, arr=x)
+        b_branch = np.apply_along_axis(constraint_b.test, axis=1, arr=x)
+
+        freq = [[sum(a_branch), sum(~a_branch)],
+                [sum(b_branch), sum(~b_branch)]]
+        
+        _, p, _, _ = chi2_contingency(observed=freq)
+
+        return p < self.alpha
+        

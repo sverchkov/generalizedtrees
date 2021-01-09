@@ -14,7 +14,7 @@ from generalizedtrees.node import MTNode, Node, NodeI
 from typing import Callable, Generic, Iterable, Optional, Protocol, Type, TypeVar
 
 from generalizedtrees.queues import CanPushPop
-from generalizedtrees.split import SplitConstructorLC
+from generalizedtrees.split import SplitConstructorLC, DefaultSplitConstructorLC
 from generalizedtrees.stop import GlobalStopLC, LocalStopLC, NeverStopLC
 from generalizedtrees.tree import Tree
 
@@ -191,7 +191,7 @@ class GreedyBuilderLC:
     local_stop: LocalStopLC = NeverStopLC()
 
     def __init__(self):
-        self.splitter = SplitConstructorLC()
+        self.splitter = DefaultSplitConstructorLC()
 
     def build_tree(self) -> Tree:
 

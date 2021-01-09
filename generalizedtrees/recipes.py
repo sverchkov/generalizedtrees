@@ -10,7 +10,7 @@ from generalizedtrees.generate import SmearingDataFactoryLC, TrepanDataFactoryLC
 from generalizedtrees.leaves import ConstantEstimator, SKProbaClassifier
 from generalizedtrees.grow import ModelTranslationNodeBuilderLC, SupervisedNodeBuilderLC
 from generalizedtrees.stop import GlobalStopTreeSizeLC, LocalStopDepthLC, LocalStopSaturation
-from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC, IJCAI19LRGradientScoreLC, ProbabilityImpurityLC
+from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC, IJCAI19LRGradientScoreLC, MofNSplitConstructorLC, ProbabilityImpurityLC
 from generalizedtrees.queues import Heap, Queue, Stack
 from generalizedtrees.predict import BinaryClassifierLC, ClassifierLC
 from generalizedtrees.givens import DataWithOracleGivensLC, SupervisedDataGivensLC
@@ -55,7 +55,13 @@ def decision_tree_classifier(max_depth: int = 20, impurity = 'entropy') -> Greed
     return learner
 
 
-def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0.05, max_attempts = 1000) -> GreedyTreeLearner:
+def trepan(
+    max_tree_size: int = 20,
+    min_samples: int = 1000,
+    dist_test_alpha = 0.05,
+    max_attempts = 1000,
+    m_of_n = False
+) -> GreedyTreeLearner:
     """
     Recipe for Trepan* (Craven and Shavlik 1995)
 
@@ -63,6 +69,8 @@ def trepan(max_tree_size: int = 20, min_samples: int = 1000, dist_test_alpha = 0
     """
 
     learner = GreedyTreeLearner()
+    if m_of_n:
+        learner.builder.splitter = MofNSplitConstructorLC()
     learner.builder.splitter.only_use_training_to_generate = True
     learner.givens = DataWithOracleGivensLC()
     learner.predictor = ClassifierLC()
