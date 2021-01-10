@@ -95,7 +95,7 @@ class GlobalStopDisjunctionLC(GlobalStopLC):
 ## General stopping criteria
 
 class NeverStopLC(LocalStopLC, GlobalStopLC):
-    def check(*args, **kwargs) -> bool:
+    def check(self, *args, **kwargs) -> bool:
         return False
 
 
@@ -135,7 +135,7 @@ class LocalStopSaturation(LocalStopLC):
                     'used with model translation, but is being used with node objects that '
                     'do not support it.')
 
-        return y.mean(axis=0).max() < self.saturation
+        return y.mean(axis=0).max() >= self.saturation
 
 
 

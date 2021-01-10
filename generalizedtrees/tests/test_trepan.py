@@ -48,10 +48,9 @@ def test_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
     logger.info("Done")
 
 
-def test_real_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
+def test_real_trepan(bc_lowD_data, bc_lowD_rf_model, caplog):
 
     from generalizedtrees.recipes import trepan
-    from generalizedtrees.features import FeatureSpec
     from generalizedtrees.split import ProbabilityImpurityLC
     from time import perf_counter
     import logging
@@ -59,9 +58,9 @@ def test_real_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
     logger = logging.getLogger()
     caplog.set_level(logging.DEBUG)
 
-    x_train = breast_cancer_data.x_train
-    x_test = breast_cancer_data.x_test
-    model = breast_cancer_rf_model
+    x_train = bc_lowD_data.x_train
+    x_test = bc_lowD_data.x_test
+    model = bc_lowD_rf_model
 
     # Learn explanation
     d = x_train.shape[1]
@@ -74,7 +73,7 @@ def test_real_trepan(breast_cancer_data, breast_cancer_rf_model, caplog):
     explanation.builder.splitter.infimum_score_to_split = -10
 
     logger.info("Fitting tree")
-    explanation.fit(x_train, model.predict_proba, feature_spec = (FeatureSpec.CONTINUOUS,)*d)
+    explanation.fit(x_train, model.predict_proba)
 
     t2 = perf_counter()
 

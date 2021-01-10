@@ -17,6 +17,7 @@ from generalizedtrees.constraints import Constraint, MofN, LEQConstraint, GTCons
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.givens import GivensLC
 from generalizedtrees import scores
+from generalizedtrees.util import ScoredItem
 
 logger = getLogger()
 
@@ -34,7 +35,7 @@ class SplitTest(Protocol):
     """
 
     @abstractmethod
-    def pick_branches(self, data_frame: np.ndarray):
+    def pick_branches(self, data_matrix: np.ndarray):
         raise NotImplementedError
 
     @property
@@ -129,6 +130,16 @@ class BinarySplit(SplitTest):
 
     def __init__(self, constraint):
         self.constraint = constraint
+
+    @cached_property
+    def constraints(self):
+        return (self.constraint, ~self.constraint)
+    
+    def pick_branches(self, data_matrix: np.ndarray):
+        return np.apply_along_axis(self.constraint.test, axis=1, arr=data_matrix).astype(np.intp)
+    
+    def __str__(self):
+        return f'Test {str(self.constraint)}'
 
 ###################################
 # Base split generating functions #
@@ -443,6 +454,7 @@ class MofNSplitConstructorLC(SplitConstructorLC):
         infimum_score_to_split: float = 0
     ) -> None:
         self.beam_width = beam_width
+        self.alpha = alpha
         self.only_use_training_to_generate = only_use_training_to_generate
         self.only_use_training_to_score = only_use_training_to_score
         self.infimum_score_to_split = infimum_score_to_split
@@ -468,7 +480,7 @@ class MofNSplitConstructorLC(SplitConstructorLC):
             s_data = data
             s_y = y
 
-        candidate_splits = [self.split_generator.genenerator(g_data, g_y)]
+        candidate_splits = list(self.split_generator.genenerator(g_data, g_y))
 
         if not candidate_splits:
             # Unlikely that code gets here but if it does
@@ -496,41 +508,49 @@ class MofNSplitConstructorLC(SplitConstructorLC):
             for constraint in best_split.constraints:
                 heapq.heappush(
                     beam,
-                    (self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y), constraint))
+                    ScoredItem(
+                        score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
+                        item = constraint))
                 while len(beam) > self.beam_width:
                     heapq.heappop(beam)
         else:
-            beam = [(best_split_score, constraint) for constraint in best_split.constraints]
+            beam = [
+                ScoredItem(score = best_split_score, item = constraint)
+                for constraint in best_split.constraints]
 
         # Beam search
         while beam != prev_beam:
+            logger.debug(f'm-of-n beam search beam: {beam}')
             prev_beam = beam.copy()
 
             # Trick to iterate over a past snapshot of the beam while modifying the real thing
-            for constraint in prev_beam:
-                for new_constraint in MofN.neighboring_tests(constraint, constraint_candidates):
-                    if self.tests_sig_diff(constraint, new_constraint, s_data, s_y):
+            for scored_constraint in prev_beam:
+                for new_constraint in MofN.neighboring_tests(scored_constraint.item, constraint_candidates):
+                    if self.tests_sig_diff(scored_constraint.item, new_constraint, s_data, s_y):
                         new_score = self.split_scorer.score(node, BinarySplit(new_constraint), s_data, s_y)
 
+                        new_scored_constraint = ScoredItem(score = new_score, item = new_constraint)
+
                         if len(beam) < self.beam_width:
-                            heapq.heappush(beam, (new_score, new_constraint))
+                            heapq.heappush(beam, new_scored_constraint)
                         else:
-                            heapq.heappushpop(beam, (new_score, new_constraint))
+                            heapq.heappushpop(beam, new_scored_constraint)
             
         # TODO: literal pruning (see pages 57-58)
 
-        return BinarySplit(max(beam)[1]) # Element 1 of the tuple is the split
+        return BinarySplit(max(beam).item)
     
 
-    def tests_siog_diff(self, constraint_a, constraint_b, x, y):
+    def tests_sig_diff(self, constraint_a, constraint_b, x, y):
 
         # TODO: check if this test should use y-values, and if so, how?
         #hard_y = y.argmax(axis=0)
         a_branch = np.apply_along_axis(constraint_a.test, axis=1, arr=x)
         b_branch = np.apply_along_axis(constraint_b.test, axis=1, arr=x)
 
-        freq = [[sum(a_branch), sum(~a_branch)],
-                [sum(b_branch), sum(~b_branch)]]
+        freq = np.array(
+            [[sum(a_branch), sum(~a_branch)],
+            [sum(b_branch), sum(~b_branch)]]) + 1 # Smoothing for 0s
         
         _, p, _, _ = chi2_contingency(observed=freq)
 

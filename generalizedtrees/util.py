@@ -3,7 +3,10 @@
 # Licensed under the BSD 3-Clause License
 # Copyright (c) 2020, Yuriy Sverchkov
 
+from dataclasses import dataclass
 from functools import total_ordering
+from typing import Any
+
 
 ## Decorator for making a class orderable
 def order_by(*attrs):
@@ -38,3 +41,11 @@ def order_by(*attrs):
         return total_ordering(cls)
     
     return decorate
+
+
+## Dataclass for scored items
+@order_by('score')
+@dataclass
+class ScoredItem:
+    score: float
+    item: Any

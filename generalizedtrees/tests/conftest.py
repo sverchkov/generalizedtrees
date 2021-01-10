@@ -59,3 +59,28 @@ def breast_cancer_rf_model(breast_cancer_data):
     rf.fit(breast_cancer_data.x_train, breast_cancer_data.y_train)
 
     return rf
+
+@pytest.fixture(scope="module")
+def bc_lowD_data(breast_cancer_data):
+
+    Dataset = namedtuple(
+        'Dataset',
+        ['x_train', 'x_test', 'y_train', 'y_test', 'feature_names', 'target_names'])
+
+    return Dataset(
+        x_train=breast_cancer_data.x_train[:, 0:3],
+        x_test=breast_cancer_data.x_test[:, 0:3],
+        y_train=breast_cancer_data.y_train,
+        y_test=breast_cancer_data.y_test,
+        feature_names=breast_cancer_data.feature_names[0:3],
+        target_names=breast_cancer_data.target_names
+    )
+
+@pytest.fixture(scope="module")
+def bc_lowD_rf_model(bc_lowD_data):
+
+    # Learn 'black-box' model
+    rf = RandomForestClassifier()
+    rf.fit(bc_lowD_data.x_train, bc_lowD_data.y_train)
+
+    return rf

@@ -146,6 +146,9 @@ class MofN(Constraint):
             (isinstance(other, MofN) and
             other.constraints == self.constraints and
             other.m_to_satisfy == self.m_to_satisfy)
+    
+    def __str__(self) -> str:
+        return f'{self.m_to_satisfy} of {[str(c) for c in self._constraints]}'
 
 
     @staticmethod
