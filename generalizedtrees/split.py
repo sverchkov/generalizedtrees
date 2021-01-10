@@ -133,7 +133,7 @@ class BinarySplit(SplitTest):
 
     @cached_property
     def constraints(self):
-        return (self.constraint, ~self.constraint)
+        return (~self.constraint, self.constraint)
     
     def pick_branches(self, data_matrix: np.ndarray):
         return np.apply_along_axis(self.constraint.test, axis=1, arr=data_matrix).astype(np.intp)

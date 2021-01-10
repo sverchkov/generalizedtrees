@@ -68,6 +68,9 @@ class NegatedConstraint(Constraint):
     
     def __invert__(self):
         return self._constraint
+    
+    def __str__(self) -> str:
+        return f'Not {str(self._constraint)}'
 
 
 class SimpleConstraint(NamedTuple):
