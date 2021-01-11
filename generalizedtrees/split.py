@@ -277,10 +277,13 @@ class ProbabilityImpurityLC(SplitScoreLC):
         branches = split.pick_branches(data)
 
         return self.impurity(y) - sum(map(
-            lambda b: self.impurity(y[branches==b, :]),
-            np.unique(branches)
-        ))
+        if self.weighted_avg:
+            n = len(y)
+            branch_impurity = lambda b: sum(branches == b) / n * self.impurity(y[branches == b, :])
+        else:
+            branch_impurity = lambda b: self.impurity(y[branches == b, :])
 
+        return self.impurity(y) - sum(map(branch_impurity, np.unique(branches)))
 
 class IJCAI19LRGradientScoreLC(SplitScoreLC):
     """
