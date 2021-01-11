@@ -3,13 +3,14 @@
 # Licensed under the BSD 3-Clause License
 # Copyright (c) 2020, Yuriy Sverchkov
 
+from numpy import ma
 from sklearn.linear_model import LogisticRegression
 
 from generalizedtrees.node import MTNode, TrepanNode
 from generalizedtrees.generate import SmearingDataFactoryLC, TrepanDataFactoryLC
 from generalizedtrees.leaves import ConstantEstimator, SKProbaClassifier
 from generalizedtrees.grow import ModelTranslationNodeBuilderLC, SupervisedNodeBuilderLC
-from generalizedtrees.stop import GlobalStopTreeSizeLC, LocalStopDepthLC, LocalStopSaturation
+from generalizedtrees.stop import GlobalStopTreeSizeLC, LocalStopDepthLC, LocalStopDisjunctionLC, LocalStopSaturation
 from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC, IJCAI19LRGradientScoreLC, MofNSplitConstructorLC, ProbabilityImpurityLC
 from generalizedtrees.queues import Heap, Queue, Stack
 from generalizedtrees.predict import BinaryClassifierLC, ClassifierLC
@@ -56,11 +57,13 @@ def decision_tree_classifier(max_depth: int = 20, impurity = 'entropy') -> Greed
 
 
 def trepan(
-    max_tree_size: int = 20,
+    m_of_n = False,
+    max_tree_depth = None,
+    max_tree_size = None,
+    impurity = 'entropy',
     min_samples: int = 1000,
     dist_test_alpha = 0.05,
     max_attempts = 1000,
-    m_of_n = False
 ) -> GreedyTreeLearner:
     """
     Recipe for Trepan* (Craven and Shavlik 1995)
@@ -75,10 +78,19 @@ def trepan(
     learner.givens = DataWithOracleGivensLC()
     learner.predictor = ClassifierLC()
     learner.queue = Heap
-    learner.global_stop = GlobalStopTreeSizeLC(max_tree_size)
+
     learner.local_stop = LocalStopSaturation(training_only=True)
-    learner.split_score = ProbabilityImpurityLC('entropy')
+    if max_tree_depth is not None:
+        learner.local_stop = LocalStopDisjunctionLC(
+            LocalStopSaturation(training_only=True),
+            LocalStopDepthLC(max_depth=max_tree_depth))
+    elif max_tree_size is not None:
+        learner.global_stop = GlobalStopTreeSizeLC(max_tree_size)
+    
+    learner.split_score = ProbabilityImpurityLC(impurity)
+
     learner.split_generator = AxisAlignedSplitGeneratorLC()
+
     learner.node_builder = ModelTranslationNodeBuilderLC(
         leaf_model=ConstantEstimator,
         min_samples=min_samples,
