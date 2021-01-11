@@ -41,7 +41,7 @@ class LocalStopConjunctionLC(LocalStopLC):
 
     def check(self, node) -> bool:
 
-        for criterion in self.criteria:
+        for criterion in self.subcriteria:
             if not criterion.check(node): return False
         
         return True
@@ -56,7 +56,7 @@ class LocalStopDisjunctionLC(LocalStopLC):
 
     def check(self, node) -> bool:
 
-        for criterion in self.criteria:
+        for criterion in self.subcriteria:
             if criterion.check(node): return True
         
         return False
@@ -71,7 +71,7 @@ class GlobalStopConjunctionLC(GlobalStopLC):
 
     def check(self, tree: Tree) -> bool:
 
-        for criterion in self.criteria:
+        for criterion in self.subcriteria:
             if not criterion.check(tree): return False
         
         return True
@@ -86,7 +86,7 @@ class GlobalStopDisjunctionLC(GlobalStopLC):
 
     def check(self, tree: Tree) -> bool:
 
-        for criterion in self.criteria:
+        for criterion in self.subcriteria:
             if criterion.check(tree): return True
         
         return False
