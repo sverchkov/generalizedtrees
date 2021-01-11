@@ -3,7 +3,7 @@
 # Licensed under the BSD 3-Clause License
 # Copyright (c) 2020, Yuriy Sverchkov
 
-from numpy import ma
+from numpy.random import default_rng
 from sklearn.linear_model import LogisticRegression
 
 from generalizedtrees.node import MTNode, TrepanNode
@@ -64,6 +64,7 @@ def trepan(
     min_samples: int = 1000,
     dist_test_alpha = 0.05,
     max_attempts = 1000,
+    rng = default_rng()
 ) -> GreedyTreeLearner:
     """
     Recipe for Trepan* (Craven and Shavlik 1995)
@@ -94,7 +95,7 @@ def trepan(
     learner.node_builder = ModelTranslationNodeBuilderLC(
         leaf_model=ConstantEstimator,
         min_samples=min_samples,
-        data_factory=TrepanDataFactoryLC(alpha=dist_test_alpha, max_attempts=max_attempts),
+        data_factory=TrepanDataFactoryLC(alpha=dist_test_alpha, max_attempts=max_attempts, rng=rng),
         node_type=TrepanNode)
 
     return learner
