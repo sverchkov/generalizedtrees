@@ -48,6 +48,7 @@ def test_trepan_numpy(breast_cancer_data, breast_cancer_rf_model, caplog):
     logger.info("Done")
 
 
+@pytest.mark.skip(reason="Very slow")
 def test_real_trepan(bc_lowD_data, bc_lowD_rf_model, caplog):
 
     from generalizedtrees.recipes import trepan
