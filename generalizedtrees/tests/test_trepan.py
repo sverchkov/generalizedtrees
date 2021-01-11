@@ -68,9 +68,9 @@ def test_real_trepan(bc_lowD_data, bc_lowD_rf_model, caplog):
     t1 = perf_counter()
 
     logger.info("Creating class instance")
-    explanation = trepan(max_tree_size = 5, max_attempts=3, m_of_n = True)
-    explanation.split_score = ProbabilityImpurityLC('gini')
-    explanation.builder.splitter.infimum_score_to_split = -10
+    explanation = trepan(max_tree_size = 6, max_attempts=3, m_of_n = True)
+    #explanation.split_score = ProbabilityImpurityLC('gini')
+    #explanation.builder.splitter.infimum_score_to_split = -10
 
     logger.info("Fitting tree")
     explanation.fit(x_train, model.predict_proba)

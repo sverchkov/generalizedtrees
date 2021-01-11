@@ -3,9 +3,10 @@
 # Licensed under the BSD 3-Clause License
 # Copyright (c) 2020, Yuriy Sverchkov
 
-from typing import Iterable, Protocol, NamedTuple, Any, Union, runtime_checkable
 from abc import abstractmethod
 from enum import Enum, Flag, auto
+from functools import reduce
+from typing import Iterable, Protocol, NamedTuple, Any, Union, runtime_checkable
 import numpy as np
 
 
@@ -52,7 +53,10 @@ class Constraint(Protocol):
 
     @abstractmethod
     def test(self, sample) -> bool:
-        pass
+        raise NotImplementedError()
+
+    def test_matrix(self, data_matrix: np.ndarray) -> np.ndarray:
+        return np.apply_along_axis(self.test, axis=1, arr=data_matrix)
 
     def __invert__(self) -> 'Constraint':
         return NegatedConstraint(self)
@@ -65,6 +69,9 @@ class NegatedConstraint(Constraint):
     
     def test(self, sample):
         return not self._constraint.test(sample)
+    
+    def test_matrix(self, data_matrix: np.ndarray) -> np.ndarray:
+        return ~self._constraint.test(data_matrix)
     
     def __invert__(self):
         return self._constraint
@@ -85,6 +92,9 @@ class SimpleConstraint(NamedTuple):
 
     def test(self, sample):
         return self.operator.test(sample[self.feature], self.value)
+
+    def test_matrix(self, data_matrix: np.ndarray) -> np.ndarray:
+        return self.operator.test(data_matrix[:,self.feature], self.value)
     
     def __invert__(self):
         return SimpleConstraint(self.feature, ~self.operator, self.value)
@@ -114,12 +124,23 @@ class MofN(Constraint):
         INC_N = auto()
         INC_NM = INC_N | INC_M
 
-    def __init__(self, m, constraints):
+    def __init__(self, m: int, constraints):
 
-        # TODO: Check if any of the constraints cancel each other out
+        constraints_list = list(constraints)
 
-        self._constraints = constraints
+        # Check for pairs of constraints that cancel each other out
+        for i, c1 in enumerate(constraints):
+            for c2 in constraints[i+1:]:
+                if c1 == ~c2:
+                    constraints_list.remove(c1)
+                    constraints_list.remove(c2)
+                    m -= 1
+
+        # TODO: Check if any of the constraints subsume each other
+
+        self._constraints = tuple(constraints_list)
         self._m = m
+
 
     @property
     def constraints(self):
@@ -144,15 +165,32 @@ class MofN(Constraint):
 
         return False
 
+    def test_matrix(self, data_matrix: np.ndarray) -> np.ndarray:
+
+        satisfied = np.zeros(data_matrix.shape[0], dtype=int)
+
+        for c in self._constraints:
+            satisfied += c.test_matrix(data_matrix)
+        
+        return satisfied >= self._m
+
     def __eq__(self, other):
         return other is self or \
             (isinstance(other, MofN) and
             other.constraints == self.constraints and
             other.m_to_satisfy == self.m_to_satisfy)
+
+    def __bool__(self) -> bool:
+        """
+        Returns false if the constraint is vacuous
+        """
+        return self._m > 1
     
     def __str__(self) -> str:
-        return f'{self.m_to_satisfy} of {[str(c) for c in self._constraints]}'
+        return f'{self.m_to_satisfy} of {[str(c) for c in self.constraints]}'
 
+    def __repr__(self) -> str:
+        return f'MofN({self.m_to_satisfy}, {self.constraints})'
 
     @staticmethod
     def neighboring_tests(
@@ -233,14 +271,8 @@ def simplify_disjunction(*constraints):
     raise NotImplementedError("Not implemented yet.")
 
 
-def test(constraints: Iterable[SimpleConstraint], data_matrix):
+def test(constraints: Iterable[Constraint], data_matrix):
+
     n, _ = data_matrix.shape
 
-    result = np.ones(n, dtype=np.bool)
-
-    for c in constraints:
-        # * is the 'and' operator for boolean ndarrays
-        result *= c.operator.test(data_matrix[:, c.feature], c.value)
-    
-    return result
-
+    return reduce(np.multiply, map(lambda c: c.test_matrix(data_matrix), constraints), np.ones(n, dtype=np.bool))

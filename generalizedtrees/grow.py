@@ -209,7 +209,7 @@ class GreedyBuilderLC:
 
                 node.split = self.splitter.construct_split(node)
 
-                if node.split is not None:
+                if node.split:
                     for child in self.node_builder.generate_children(node):
                         child_ptr = tree.add_node(child, parent_key=ptr)
                         queue.push((child, child_ptr))

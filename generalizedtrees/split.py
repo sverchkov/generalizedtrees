@@ -136,10 +136,14 @@ class BinarySplit(SplitTest):
         return (~self.constraint, self.constraint)
     
     def pick_branches(self, data_matrix: np.ndarray):
-        return np.apply_along_axis(self.constraint.test, axis=1, arr=data_matrix).astype(np.intp)
+        return self.constraint.test_matrix(data_matrix).astype(np.intp)
     
     def __str__(self):
         return f'Test {str(self.constraint)}'
+    
+    def __bool__(self):
+        # Calling bool on a constraint object should return false if that constraint is vacuous
+        return bool(self.constraint)
 
 ###################################
 # Base split generating functions #
@@ -269,14 +273,15 @@ class ProbabilityImpurityLC(SplitScoreLC):
     def __init__(self, impurity: str = 'gini') -> None:
         if impurity == 'gini':
             self.impurity = scores.gini_of_p_matrix
+            self.weighted_avg = False
         else: #information gain
             self.impurity = scores.entropy_of_p_matrix
+            self.weighted_avg = True
 
     def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
         
         branches = split.pick_branches(data)
 
-        return self.impurity(y) - sum(map(
         if self.weighted_avg:
             n = len(y)
             branch_impurity = lambda b: sum(branches == b) / n * self.impurity(y[branches == b, :])
@@ -284,6 +289,7 @@ class ProbabilityImpurityLC(SplitScoreLC):
             branch_impurity = lambda b: self.impurity(y[branches == b, :])
 
         return self.impurity(y) - sum(map(branch_impurity, np.unique(branches)))
+
 
 class IJCAI19LRGradientScoreLC(SplitScoreLC):
     """
