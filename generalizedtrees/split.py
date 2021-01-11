@@ -263,8 +263,9 @@ class DiscreteInformationGainLC(SplitScoreLC):
 
     def score(self, node, split: SplitTest, data: np.ndarray, y: np.ndarray) -> float:
         branches = split.pick_branches(data)
+        n = len(y)
         return scores.entropy_of_label_column(y) - sum(map(
-            lambda b: scores.entropy_of_label_column(y[branches == b]),
+            lambda b: sum(branches == b) / n * scores.entropy_of_label_column(y[branches == b]),
             np.unique(branches)))
 
 
