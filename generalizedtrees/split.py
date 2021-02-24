@@ -13,7 +13,7 @@ import heapq
 import numpy as np
 from scipy.stats import chi2_contingency
 
-from generalizedtrees.constraints import Constraint, MofN, LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
+from generalizedtrees.constraints import Constraint, MofN, SimpleConstraint, Op, LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.givens import GivensLC
 from generalizedtrees import scores
@@ -208,7 +208,7 @@ def all_values_split(feature, values):
 
 
 ##############################
-# Split Candidate Generators #
+# Split Candidate Generators # - To be deprecated
 ##############################
 
 
@@ -242,6 +242,86 @@ class AxisAlignedSplitGeneratorLC(SplitCandidateGeneratorLC):
                 yield from one_vs_all(data[:, j], j)
             else:
                 raise ValueError(f"I don't know how to handle feature spec {self.feature_spec[j]}")
+
+
+##############################################
+# Constraint candidates generating functions #
+##############################################
+
+def generate_fayyad_thresholds(
+    feature_vector: np.ndarray,
+    feature_index: int,
+    target_matrix: np.ndarray,
+    one_sided: bool
+) -> Iterable[Constraint]:
+    """
+    Generator of split constraints for numeric (or more generally orderable) values.
+
+    We only generate splits between distinctly labeled distinct adjacent values.
+    Fayyad and Irani (1992) prove that such splits are always better (in terms of entropy) than
+    splits between adjacent equally labeled values.
+
+    :param feature_vectpr: Input data feature vector, length n
+    :param feature_index: Index of splitting feature (needed to create split object)
+    :param target_matrix: Target value matrix, n-by-k
+    :param one_sided: Whether to generate the constraint only on one side of each threshold
+    """
+    v = sorted(zip(feature_vector, target_matrix), key=itemgetter(0))
+    
+    # Flag for handling the case when two identical x-values have distinct y-values
+    x_collision = False
+
+    for j in range(1, len(v), 1):
+        x_prev, y_prev = v[j-1]
+        x, y = v[j]
+
+        # Only place splits between distinct x-values
+        if x_prev < x:
+            # Only place splits between distinct y-values
+            if x_collision or np.any(y_prev != y):
+                split_point = (x_prev + x)/2
+                yield SimpleConstraint(feature_index, Op.LEQ, split_point)
+                if not one_sided:
+                    yield SimpleConstraint(feature_index, Op.GT, split_point)
+            # Reset collision flag when advancing in x-space
+            x_collision = False
+        else:
+            # Detect y-collision
+            if np.any(y_prev != y):
+                x_collision = True
+
+
+def generate_eq_constraints(feature_vector: np.ndarray, feature_index: int, all_but_one: bool) -> Iterable[Constraint]:
+    """
+    Generator of split constraints for discrete features.
+    
+    Generates an equality constraint for all (or all but one) of the values in the data.
+    :param feature_vector: Feature vector from data
+    :param feature_index: Index of splitting feature
+    :param all_but_one: Whether to yield all but one (as opposed to all) of the values
+    """
+
+    values = np.unique(feature_vector)
+    if all_but_one: values = values[:-1]
+
+    for x in values:
+        yield SimpleConstraint(feature_index, Op.EQ, x)
+
+
+def generate_atomic_constraints(
+    data: np.ndarray,
+    y: np.ndarray,
+    feature_spec: Container[FeatureSpec],
+    one_sided: bool
+) -> Iterable[Constraint]:
+
+    for j, spec in enumerate(feature_spec):
+        if spec is FeatureSpec.CONTINUOUS:
+            yield from generate_fayyad_thresholds(data[:,j], j, y, one_sided)
+        if spec & FeatureSpec.DISCRETE:
+            yield from generate_eq_constraints(data[:,j], j, one_sided)
+        else:
+            raise ValueError(f"I don't know how to handle feature spec {spec}")
 
 
 ####################################
@@ -399,6 +479,9 @@ class SplitConstructorLC:
     only_use_training_to_generate: bool
     only_use_training_to_score: bool
     infimum_score_to_split: float
+
+    def initialize(self, givens: GivensLC) -> None:
+        pass
 
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
         raise NotImplementedError()
@@ -566,3 +649,108 @@ class MofNSplitConstructorLC(SplitConstructorLC):
 
         return p < self.alpha
         
+
+class GroupSplitConstructorLC(SplitConstructorLC):
+
+    def __init__(
+        self,
+        beam_width = 2,
+        alpha = 0.05
+    ) -> None:
+
+        self.feature_groups = None # Initialized in initialize
+        self.beam_width: int = beam_width
+        self.alpha: float = alpha
+
+    def initialize(self, givens: GivensLC) -> None:
+        # Being explicit about what we're using from givens
+        self.feature_spec = givens.feature_spec
+        self.feature_groups = givens.feature_groups
+    
+    def construct_split(self, node, data: Optional[np.ndarray], y: Optional[np.ndarray]) -> SplitTest:
+        
+        if data is None:
+            data = node.data
+        
+        if y is None:
+            y = node.y
+        
+        if self.only_use_training_to_generate:
+            g_data = data[:node.n_training, :]
+            g_y = y[:node.n_training, :]
+        else:
+            g_data = data
+            g_y = y
+        
+        if self.only_use_training_to_score:
+            s_data = data[:node.n_training, :]
+            s_y = y[:node.n_training, :]
+        else:
+            s_data = data
+            s_y = y
+        
+        all_constraint_candidates = list(
+            generate_atomic_constraints(g_data, g_y, feature_spec=self.feature_spec, one_sided = True))
+
+        # Will record best split
+        best_split = None
+        best_split_score = 0
+
+        # For each feature group
+        for feature_group in self.feature_groups:
+
+            # Filter constraint candidates to those within the group
+            constraint_candidates = [c for c in all_constraint_candidates if c.feature in feature_group]
+
+            # Initialize beam
+            prev_beam = []
+            beam = []
+            for constraint in constraint_candidates:
+                heapq.heappush(
+                    beam,
+                    ScoredItem(
+                        score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
+                        item = constraint))
+
+            # Beam search
+            while beam != prev_beam:
+                logger.debug(f'm-of-n beam search beam: {beam}')
+                prev_beam = beam.copy()
+
+                # Trick to iterate over a past snapshot of the beam while modifying the real thing
+                for scored_constraint in prev_beam:
+                    for new_constraint in MofN.neighboring_tests(scored_constraint.item, constraint_candidates):
+                        if self.tests_sig_diff(scored_constraint.item, new_constraint, s_data, s_y):
+                            new_score = self.split_scorer.score(node, BinarySplit(new_constraint), s_data, s_y)
+
+                            new_scored_constraint = ScoredItem(score = new_score, item = new_constraint)
+
+                            if len(beam) < self.beam_width:
+                                heapq.heappush(beam, new_scored_constraint)
+                            else:
+                                heapq.heappushpop(beam, new_scored_constraint)
+                
+            # TODO: literal pruning (see pages 57-58)
+
+            # See if this beats best group-level winner
+            winner = max(beam)
+            if winner.score > best_split_score:
+                best_split_score = winner.score
+                best_split = BinarySplit(winner.item)
+
+        return best_split
+        
+    def tests_sig_diff(self, constraint_a, constraint_b, x, y):
+
+        # TODO: check if this test should use y-values, and if so, how?
+        #hard_y = y.argmax(axis=0)
+        a_branch = np.apply_along_axis(constraint_a.test, axis=1, arr=x)
+        b_branch = np.apply_along_axis(constraint_b.test, axis=1, arr=x)
+
+        freq = np.array(
+            [[sum(a_branch), sum(~a_branch)],
+            [sum(b_branch), sum(~b_branch)]]) + 1 # Smoothing for 0s
+        
+        _, p, _, _ = chi2_contingency(observed=freq)
+
+        return p < self.alpha
