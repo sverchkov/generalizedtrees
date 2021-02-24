@@ -667,7 +667,7 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         self.feature_spec = givens.feature_spec
         self.feature_groups = givens.feature_groups
     
-    def construct_split(self, node, data: Optional[np.ndarray], y: Optional[np.ndarray]) -> SplitTest:
+    def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
         
         if data is None:
             data = node.data
