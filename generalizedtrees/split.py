@@ -658,9 +658,11 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         alpha = 0.05
     ) -> None:
 
-        self.feature_groups = None # Initialized in initialize
         self.beam_width: int = beam_width
         self.alpha: float = alpha
+        # Initialized in initialize
+        self.feature_groups = None
+        self.feature_spec = None
 
     def initialize(self, givens: GivensLC) -> None:
         # Being explicit about what we're using from givens
