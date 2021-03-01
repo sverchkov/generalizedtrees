@@ -316,7 +316,7 @@ def generate_atomic_constraints(
 ) -> Iterable[Constraint]:
 
     for j, spec in enumerate(feature_spec):
-        if spec is FeatureSpec.CONTINUOUS:
+        if spec & FeatureSpec.ORDERED:
             yield from generate_fayyad_thresholds(data[:,j], j, y, one_sided)
         if spec & FeatureSpec.DISCRETE:
             yield from generate_eq_constraints(data[:,j], j, one_sided)
