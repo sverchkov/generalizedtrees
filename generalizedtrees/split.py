@@ -500,6 +500,9 @@ class DefaultSplitConstructorLC(SplitConstructorLC):
         self.only_use_training_to_score = only_use_training_to_score
         self.infimum_score_to_split = infimum_score_to_split
 
+    def initialize(self, givens: GivensLC) -> None:
+        self.split_generator.initialize(givens)
+
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
 
         if data is None:
@@ -552,6 +555,9 @@ class MofNSplitConstructorLC(SplitConstructorLC):
         self.only_use_training_to_score = only_use_training_to_score
         self.infimum_score_to_split = infimum_score_to_split
     
+    def initialize(self, givens: GivensLC) -> None:
+        self.split_generator.initialize(givens)
+
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
         if data is None:
             data = node.data
@@ -708,11 +714,14 @@ class GroupSplitConstructorLC(SplitConstructorLC):
             prev_beam = []
             beam = []
             for constraint in constraint_candidates:
-                heapq.heappush(
-                    beam,
-                    ScoredItem(
+                new_scored_constraint = ScoredItem(
                         score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
-                        item = constraint))
+                        item = constraint)
+
+                if len(beam) < self.beam_width:
+                    heapq.heappush(beam, new_scored_constraint)
+                else:
+                    heapq.heappushpop(beam, new_scored_constraint)
 
             # Beam search
             while beam != prev_beam:
