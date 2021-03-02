@@ -658,14 +658,26 @@ class MofNSplitConstructorLC(SplitConstructorLC):
 
 class GroupSplitConstructorLC(SplitConstructorLC):
 
+    SUPPORTED_SEARCH_MODES = ('m_of_n', 'groups')
+
     def __init__(
         self,
         beam_width = 2,
-        alpha = 0.05
+        alpha = 0.05,
+        search_mode = 'm_of_n'
     ) -> None:
 
         self.beam_width: int = beam_width
         self.alpha: float = alpha
+
+        # Validate search mode
+        if search_mode in GroupSplitConstructorLC.SUPPORTED_SEARCH_MODES:
+            self.search_mode = search_mode
+        else:
+            raise ValueError(
+                f'Unsupported search mode "{search_mode}", '
+                f'supported modes are: {GroupSplitConstructorLC.SUPPORTED_SEARCH_MODES}.')
+
         # Initialized in initialize
         self.feature_groups = None
         self.feature_spec = None
@@ -706,51 +718,116 @@ class GroupSplitConstructorLC(SplitConstructorLC):
 
         # For each feature group
         for feature_group in self.feature_groups:
-
-            # Filter constraint candidates to those within the group
-            constraint_candidates = [c for c in all_constraint_candidates if c.feature in feature_group]
-
-            # Initialize beam
-            prev_beam = []
-            beam = []
-            for constraint in constraint_candidates:
-                new_scored_constraint = ScoredItem(
-                        score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
-                        item = constraint)
-
-                if len(beam) < self.beam_width:
-                    heapq.heappush(beam, new_scored_constraint)
-                else:
-                    heapq.heappushpop(beam, new_scored_constraint)
-
-            # Beam search
-            while beam != prev_beam:
-                logger.debug(f'm-of-n beam search beam: {beam}')
-                prev_beam = beam.copy()
-
-                # Trick to iterate over a past snapshot of the beam while modifying the real thing
-                for scored_constraint in prev_beam:
-                    for new_constraint in MofN.neighboring_tests(scored_constraint.item, constraint_candidates):
-                        if self.tests_sig_diff(scored_constraint.item, new_constraint, s_data, s_y):
-                            new_score = self.split_scorer.score(node, BinarySplit(new_constraint), s_data, s_y)
-
-                            new_scored_constraint = ScoredItem(score = new_score, item = new_constraint)
-
-                            if len(beam) < self.beam_width:
-                                heapq.heappush(beam, new_scored_constraint)
-                            else:
-                                heapq.heappushpop(beam, new_scored_constraint)
-                
-            # TODO: literal pruning (see pages 57-58)
-
+            
             # See if this beats best group-level winner
-            winner = max(beam)
+            winner = self._group_constraint_search()
             if winner.score > best_split_score:
                 best_split_score = winner.score
                 best_split = BinarySplit(winner.item)
 
         return best_split
-        
+    
+    def _group_constrains_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+
+        if self.search_mode == 'm_of_n':
+            return self._m_of_n_split_search(node, s_data, s_y, all_constraint_candidates, feature_group)
+        if self.search_mode == 'groups':
+            return self._groups_split_search(node, s_data, s_y, all_constraint_candidates, feature_group)
+
+        raise ValueError(f'Invalid search mode "self.search_mode"')        
+
+    def _groups_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+
+        # Get best atomic split for each feature in the group
+        starting_constraint_dict = {
+            feature: max([
+                ScoredItem(
+                    score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
+                    item = constraint)
+                for constraint in all_constraint_candidates
+                if constraint.feature == feature
+            ]).item
+            for feature in feature_group
+        }
+
+        best = ScoredItem(score = 0, item = None)
+
+        def score_cd(m, constraint_dict):
+            constraint = MofN(m, constraint_dict.values)
+            return ScoredItem(
+                score = self.split_scorer.score(
+                    node,
+                    BinarySplit(constraint),
+                    s_data, s_y),
+                item = constraint)
+
+        # For each m-value
+        for m in range(len(feature_group)+1):
+
+            # Start with constraint thresholds based on best atomic splits
+            best_constraint_dict = starting_constraint_dict.copy()
+
+            best_for_m = score_cd(m, best_constraint_dict)
+            
+            prev_constraint_dict = {}
+            # Greedy search 1-feature threshold changes
+            while best_constraint_dict != prev_constraint_dict:
+                prev_constraint_dict = best_constraint_dict
+                for feature in feature_group:
+                    for constraint in all_constraint_candidates:
+                        if constraint.feature == feature and constraint != best_constraint_dict[feature]:
+                            candidate_constraint_dict = best_constraint_dict.copy()
+                            candidate = score_cd(m, candidate_constraint_dict)
+                            if candidate > best_for_m:
+                                best_for_m = candidate
+                                best_constraint_dict = candidate_constraint_dict
+            
+            # Remember best
+            if best_for_m > best:
+                best = best_for_m
+
+        return best
+
+    def _m_of_n_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+
+        # Filter constraint candidates to those within the group
+        constraint_candidates = [c for c in all_constraint_candidates if c.feature in feature_group]
+
+        # Initialize beam
+        prev_beam = []
+        beam = []
+        for constraint in constraint_candidates:
+            new_scored_constraint = ScoredItem(
+                    score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
+                    item = constraint)
+
+            if len(beam) < self.beam_width:
+                heapq.heappush(beam, new_scored_constraint)
+            else:
+                heapq.heappushpop(beam, new_scored_constraint)
+
+        # Beam search
+        while beam != prev_beam:
+            logger.debug(f'm-of-n beam search beam: {beam}')
+            prev_beam = beam.copy()
+
+            # Trick to iterate over a past snapshot of the beam while modifying the real thing
+            for scored_constraint in prev_beam:
+                for new_constraint in MofN.neighboring_tests(scored_constraint.item, constraint_candidates):
+                    if self.tests_sig_diff(scored_constraint.item, new_constraint, s_data, s_y):
+                        new_score = self.split_scorer.score(node, BinarySplit(new_constraint), s_data, s_y)
+
+                        new_scored_constraint = ScoredItem(score = new_score, item = new_constraint)
+
+                        if len(beam) < self.beam_width:
+                            heapq.heappush(beam, new_scored_constraint)
+                        else:
+                            heapq.heappushpop(beam, new_scored_constraint)
+            
+        # TODO: literal pruning (see pages 57-58)
+
+        return max(beam)
+
     def tests_sig_diff(self, constraint_a, constraint_b, x, y):
 
         # TODO: check if this test should use y-values, and if so, how?
