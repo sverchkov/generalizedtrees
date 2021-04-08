@@ -720,14 +720,14 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         for feature_group in self.feature_groups:
             
             # See if this beats best group-level winner
-            winner = self._group_constraint_search()
+            winner = self._group_constraints_search(node, s_data, s_y, all_constraint_candidates, feature_group)
             if winner.score > best_split_score:
                 best_split_score = winner.score
                 best_split = BinarySplit(winner.item)
 
         return best_split
     
-    def _group_constrains_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+    def _group_constraints_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
 
         if self.search_mode == 'm_of_n':
             return self._m_of_n_split_search(node, s_data, s_y, all_constraint_candidates, feature_group)
