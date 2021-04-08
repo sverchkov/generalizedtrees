@@ -142,7 +142,7 @@ class DataWithOracleGivensLC(GivensLC):
             logger.info(
                 'Inferring that oracle is a Scikit-Learn-like classifier '
                 'and using the "predict" method.')
-            self.oracle = lambda x: np.eye(len(oracle.classes_))[oracle.predict(x),]
+            self.oracle = lambda x: np.eye(len(oracle.classes_))[oracle.predict(x).astype('intp'),]
         else:
             logger.info('Treating oracle as a function')
             self.oracle = oracle
