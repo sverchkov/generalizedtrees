@@ -365,7 +365,7 @@ class ProbabilityImpurityLC(SplitScoreLC):
 
         if self.weighted_avg:
             n = len(y)
-            branch_impurity = lambda b: sum(branches == b) / n * self.impurity(y[branches == b, :])
+            branch_impurity = lambda b: (branches == b).sum() / n * self.impurity(y[branches == b, :])
         else:
             branch_impurity = lambda b: self.impurity(y[branches == b, :])
 
