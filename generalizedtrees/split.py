@@ -712,6 +712,10 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         all_constraint_candidates = list(
             generate_atomic_constraints(g_data, g_y, feature_spec=self.feature_spec, one_sided = True))
 
+        if not all_constraint_candidates:
+            logger.error('There were no constraint candidates for building a split!')
+            return None # Or should this be an exception?
+
         # Will record best split
         best_split = None
         best_split_score = 0
@@ -734,7 +738,7 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         if self.search_mode == 'groups':
             return self._groups_split_search(node, s_data, s_y, all_constraint_candidates, feature_group)
 
-        raise ValueError(f'Invalid search mode "self.search_mode"')        
+        raise ValueError(f'Invalid search mode "{self.search_mode}"')        
 
     def _groups_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
 
