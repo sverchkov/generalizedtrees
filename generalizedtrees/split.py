@@ -302,7 +302,7 @@ def generate_eq_constraints(feature_vector: np.ndarray, feature_index: int, all_
     """
 
     values = np.unique(feature_vector)
-    if all_but_one: values = values[:-1]
+    if all_but_one and len(values) > 1: values = values[:-1]
 
     for x in values:
         yield SimpleConstraint(feature_index, Op.EQ, x)
