@@ -110,10 +110,25 @@ class DataWithOracleGivensLC(GivensLC):
     a predictor oracle.
     """
 
-    def process(self, data, oracle, *args, target_names=None, prelabel_data=True, **kwargs):
+    def process(self, data, oracle, *args, target_names=None, prelabel_data=True, feature_groups=None, **kwargs):
+        """
+        Processing input for the explanation setting:
+
+        :param: data - the n-by-d feature matrix
+        :param: oracle - the oracle, can either be a SKLearn-like classifier, in which case the predict function is
+            used, or a function that takes data and outputs a prediction (in matrix form).
+        :param: target_names - The names of the target classes/components.
+        :param: prelabel_data - Whether to run the oracle on the data first, before building the model
+        :param: feature_groups - Used in some explanation configurations - A list of lists of feature indeces
+            representing semantically meaningful feature groups
+        """
 
         if target_names is not None:
             self.target_names = target_names
+        
+        if feature_groups is not None:
+            # TODO: Validation
+            self.feature_groups = feature_groups
 
         # Parse data
         self.data_matrix, self.feature_names, self.feature_spec = parse_data(
@@ -127,7 +142,7 @@ class DataWithOracleGivensLC(GivensLC):
             logger.info(
                 'Inferring that oracle is a Scikit-Learn-like classifier '
                 'and using the "predict" method.')
-            self.oracle = lambda x: np.eye(len(oracle.classes_))[oracle.predict(x),]
+            self.oracle = lambda x: np.eye(len(oracle.classes_))[oracle.predict(x).astype('intp'),]
         else:
             logger.info('Treating oracle as a function')
             self.oracle = oracle

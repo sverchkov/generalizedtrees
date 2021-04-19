@@ -105,8 +105,7 @@ class GreedyTreeLearner:
         
         # Set components
         self.predictor.initialize(self.givens)
-        self.builder.node_builder.initialize(self.givens)
-        self.split_generator.initialize(self.givens)
+        self.builder.initialize(self.givens)
 
         # Build tree
         self.tree = self.builder.build_tree()
