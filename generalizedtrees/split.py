@@ -686,6 +686,23 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         # Being explicit about what we're using from givens
         self.feature_spec = givens.feature_spec
         self.feature_groups = givens.feature_groups
+
+        # Verify that all features in the groups are in the spec
+        n = len(self.feature_groups)
+        self.feature_groups = []
+        for group in givens.feature_groups:
+            featureSet = set()
+            for f in group:
+                if f < n:
+                    featureSet.add(f)
+                else:
+                    logger.warning(
+                        f'Feature {f} (referenced in feature groups) '
+                        'is not in our feature spec!')
+            if featureSet:
+                self.feature_groups.append(featureSet)
+            else:
+                logger.warning('Dropping empty feature group!')
     
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
         
