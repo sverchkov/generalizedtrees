@@ -688,7 +688,7 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         self.feature_groups = givens.feature_groups
 
         # Verify that all features in the groups are in the spec
-        n = len(self.feature_groups)
+        n = len(self.feature_spec)
         self.feature_groups = []
         for group in givens.feature_groups:
             featureSet = set()

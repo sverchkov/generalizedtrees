@@ -1,3 +1,4 @@
+from generalizedtrees.features import FeatureSpec
 import pytest
 
 def test_fgroups_method(breast_cancer_data, breast_cancer_rf_model, caplog):
@@ -70,7 +71,7 @@ def test_fgroups_method_bin_data(small_weights_data, small_weights_model, caplog
     model = small_weights_model
 
     # Feature groups
-    fg = [[0,1,2,3], [3,4,5], [5,6,7,8,9]]
+    fg = [[0,1,2,3], [3,4,5], [5,6,7,8,9], [12, 15]]
 
     logger.info("Creating explainer object")
 
@@ -96,7 +97,7 @@ def test_fgroups_method_bin_data(small_weights_data, small_weights_model, caplog
 
     t1 = perf_counter()
 
-    explainer.fit(x_train, model, feature_groups = fg)
+    explainer.fit(x_train, model, feature_groups = fg, feature_spec = (FeatureSpec.DISCRETE,) * 10)
 
     t2 = perf_counter()
 
