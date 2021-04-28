@@ -760,16 +760,22 @@ class GroupSplitConstructorLC(SplitConstructorLC):
     def _groups_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
 
         # Get best atomic split for each feature in the group
-        starting_constraint_dict = {
-            feature: max([
-                ScoredItem(
-                    score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
-                    item = constraint)
-                for constraint in all_constraint_candidates
-                if constraint.feature == feature
-            ]).item
-            for feature in feature_group
-        }
+        try:
+            starting_constraint_dict = {
+                feature: max([
+                    ScoredItem(
+                        score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
+                        item = constraint)
+                    for constraint in all_constraint_candidates
+                    if constraint.feature == feature
+                ]).item
+                for feature in feature_group
+            }
+        except:
+            logger.debug('Failure in group split search')
+            logger.debug(f'Feature group: {feature_group}')
+            logger.debug(f'Constraint candidates: {all_constraint_candidates}')
+            raise
 
         best = ScoredItem(score = 0, item = None)
 
