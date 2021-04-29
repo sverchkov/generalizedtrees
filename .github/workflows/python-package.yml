@@ -17,7 +17,6 @@ jobs:
       matrix:
         python-version: [3.8, 3.9]
         requirements-cmd:
-          - -r testing-requirements.txt -r oldest
           - -r testing-requirements.txt -r requirements.txt
         pytest-run-cmd:
           - pytest
@@ -26,6 +25,8 @@ jobs:
             requirements-cmd: -r testing-requirements.txt -r requirements.txt
             pytest-run-cmd: pytest
         include:
+          - python-version: 3.8
+            requirements-cmd: -r testing-requirements.txt -r oldest
           - python-version: 3.9
             requirements-cmd: -r testing-requirements.txt -r coverage-requirements.txt -r requirements.txt
             pytest-run-cmd: |
