@@ -1,6 +1,6 @@
-.. image:: https://travis-ci.com/Craven-Biostat-Lab/generalizedtrees.svg?branch=master
+.. image:: https://github.com/Craven-Biostat-Lab/generalizedtrees/actions/workflows/python-package.yml/badge.svg
     :alt: Build Status
-    :target: https://travis-ci.com/Craven-Biostat-Lab/generalizedtrees
+    :target: https://github.com/Craven-Biostat-Lab/generalizedtrees/actions/workflows/python-package.yml
 
 .. image:: https://codecov.io/gh/Craven-Biostat-Lab/generalizedtrees/branch/master/graph/badge.svg
     :alt: codecov
