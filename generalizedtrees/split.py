@@ -7,6 +7,7 @@ from abc import abstractmethod
 from logging import getLogger
 from typing import Collection, Container, Iterable, Protocol, Optional
 from functools import cached_property
+from collections import defaultdict
 from operator import itemgetter
 import heapq
 
@@ -761,16 +762,18 @@ class GroupSplitConstructorLC(SplitConstructorLC):
 
         # Get best atomic split for each feature in the group
         try:
-            starting_constraint_dict = {
-                feature: max([
-                    ScoredItem(
-                        score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
-                        item = constraint)
-                    for constraint in all_constraint_candidates
-                    if constraint.feature == feature
-                ]).item
-                for feature in feature_group
-            }
+            best_constraint_scores = {}
+            for constraint in all_constraint_candidates:
+                f = constraint.feature
+                if f in feature_group:
+                    score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y)
+                    if f not in best_constraint_scores or best_constraint_scores[f].score < score:
+                        best_constraint_scores[f] = ScoredItem(
+                            score=score,
+                            item=constraint)
+
+            starting_constraint_dict = {feat: si.item for feat, si in best_constraint_scores.items()}
+
         except:
             logger.debug('Failure in group split search')
             logger.debug(f'Feature group: {feature_group}')
