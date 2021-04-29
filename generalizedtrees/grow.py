@@ -192,6 +192,10 @@ class GreedyBuilderLC:
 
     def __init__(self):
         self.splitter = DefaultSplitConstructorLC()
+    
+    def initialize(self, givens: GivensLC) -> None:
+        self.node_builder.initialize(givens)
+        self.splitter.initialize(givens)
 
     def build_tree(self) -> Tree:
 

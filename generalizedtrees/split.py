@@ -7,13 +7,14 @@ from abc import abstractmethod
 from logging import getLogger
 from typing import Collection, Container, Iterable, Protocol, Optional
 from functools import cached_property
+from collections import defaultdict
 from operator import itemgetter
 import heapq
 
 import numpy as np
 from scipy.stats import chi2_contingency
 
-from generalizedtrees.constraints import Constraint, MofN, LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
+from generalizedtrees.constraints import Constraint, MofN, SimpleConstraint, Op, LEQConstraint, GTConstraint, NEQConstraint, EQConstraint
 from generalizedtrees.features import FeatureSpec
 from generalizedtrees.givens import GivensLC
 from generalizedtrees import scores
@@ -208,7 +209,7 @@ def all_values_split(feature, values):
 
 
 ##############################
-# Split Candidate Generators #
+# Split Candidate Generators # - To be deprecated
 ##############################
 
 
@@ -242,6 +243,86 @@ class AxisAlignedSplitGeneratorLC(SplitCandidateGeneratorLC):
                 yield from one_vs_all(data[:, j], j)
             else:
                 raise ValueError(f"I don't know how to handle feature spec {self.feature_spec[j]}")
+
+
+##############################################
+# Constraint candidates generating functions #
+##############################################
+
+def generate_fayyad_thresholds(
+    feature_vector: np.ndarray,
+    feature_index: int,
+    target_matrix: np.ndarray,
+    one_sided: bool
+) -> Iterable[Constraint]:
+    """
+    Generator of split constraints for numeric (or more generally orderable) values.
+
+    We only generate splits between distinctly labeled distinct adjacent values.
+    Fayyad and Irani (1992) prove that such splits are always better (in terms of entropy) than
+    splits between adjacent equally labeled values.
+
+    :param feature_vectpr: Input data feature vector, length n
+    :param feature_index: Index of splitting feature (needed to create split object)
+    :param target_matrix: Target value matrix, n-by-k
+    :param one_sided: Whether to generate the constraint only on one side of each threshold
+    """
+    v = sorted(zip(feature_vector, target_matrix), key=itemgetter(0))
+    
+    # Flag for handling the case when two identical x-values have distinct y-values
+    x_collision = False
+
+    for j in range(1, len(v), 1):
+        x_prev, y_prev = v[j-1]
+        x, y = v[j]
+
+        # Only place splits between distinct x-values
+        if x_prev < x:
+            # Only place splits between distinct y-values
+            if x_collision or np.any(y_prev != y):
+                split_point = (x_prev + x)/2
+                yield SimpleConstraint(feature_index, Op.LEQ, split_point)
+                if not one_sided:
+                    yield SimpleConstraint(feature_index, Op.GT, split_point)
+            # Reset collision flag when advancing in x-space
+            x_collision = False
+        else:
+            # Detect y-collision
+            if np.any(y_prev != y):
+                x_collision = True
+
+
+def generate_eq_constraints(feature_vector: np.ndarray, feature_index: int, all_but_one: bool) -> Iterable[Constraint]:
+    """
+    Generator of split constraints for discrete features.
+    
+    Generates an equality constraint for all (or all but one) of the values in the data.
+    :param feature_vector: Feature vector from data
+    :param feature_index: Index of splitting feature
+    :param all_but_one: Whether to yield all but one (as opposed to all) of the values
+    """
+
+    values = np.unique(feature_vector)
+    if all_but_one and len(values) > 1: values = values[:-1]
+
+    for x in values:
+        yield SimpleConstraint(feature_index, Op.EQ, x)
+
+
+def generate_atomic_constraints(
+    data: np.ndarray,
+    y: np.ndarray,
+    feature_spec: Container[FeatureSpec],
+    one_sided: bool
+) -> Iterable[Constraint]:
+
+    for j, spec in enumerate(feature_spec):
+        if spec & FeatureSpec.ORDERED:
+            yield from generate_fayyad_thresholds(data[:,j], j, y, one_sided)
+        elif spec & FeatureSpec.DISCRETE:
+            yield from generate_eq_constraints(data[:,j], j, one_sided)
+        else:
+            raise ValueError(f"I don't know how to handle feature spec {spec}")
 
 
 ####################################
@@ -285,7 +366,7 @@ class ProbabilityImpurityLC(SplitScoreLC):
 
         if self.weighted_avg:
             n = len(y)
-            branch_impurity = lambda b: sum(branches == b) / n * self.impurity(y[branches == b, :])
+            branch_impurity = lambda b: (branches == b).sum() / n * self.impurity(y[branches == b, :])
         else:
             branch_impurity = lambda b: self.impurity(y[branches == b, :])
 
@@ -400,6 +481,9 @@ class SplitConstructorLC:
     only_use_training_to_score: bool
     infimum_score_to_split: float
 
+    def initialize(self, givens: GivensLC) -> None:
+        pass
+
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
         raise NotImplementedError()
 
@@ -416,6 +500,9 @@ class DefaultSplitConstructorLC(SplitConstructorLC):
         self.only_use_training_to_generate = only_use_training_to_generate
         self.only_use_training_to_score = only_use_training_to_score
         self.infimum_score_to_split = infimum_score_to_split
+
+    def initialize(self, givens: GivensLC) -> None:
+        self.split_generator.initialize(givens)
 
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
 
@@ -469,6 +556,9 @@ class MofNSplitConstructorLC(SplitConstructorLC):
         self.only_use_training_to_score = only_use_training_to_score
         self.infimum_score_to_split = infimum_score_to_split
     
+    def initialize(self, givens: GivensLC) -> None:
+        self.split_generator.initialize(givens)
+
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
         if data is None:
             data = node.data
@@ -566,3 +656,219 @@ class MofNSplitConstructorLC(SplitConstructorLC):
 
         return p < self.alpha
         
+
+class GroupSplitConstructorLC(SplitConstructorLC):
+
+    SUPPORTED_SEARCH_MODES = ('m_of_n', 'groups')
+
+    def __init__(
+        self,
+        beam_width = 2,
+        alpha = 0.05,
+        search_mode = 'm_of_n'
+    ) -> None:
+
+        self.beam_width: int = beam_width
+        self.alpha: float = alpha
+
+        # Validate search mode
+        if search_mode in GroupSplitConstructorLC.SUPPORTED_SEARCH_MODES:
+            self.search_mode = search_mode
+        else:
+            raise ValueError(
+                f'Unsupported search mode "{search_mode}", '
+                f'supported modes are: {GroupSplitConstructorLC.SUPPORTED_SEARCH_MODES}.')
+
+        # Initialized in initialize
+        self.feature_groups = None
+        self.feature_spec = None
+
+    def initialize(self, givens: GivensLC) -> None:
+        # Being explicit about what we're using from givens
+        self.feature_spec = givens.feature_spec
+        self.feature_groups = givens.feature_groups
+
+        # Verify that all features in the groups are in the spec
+        n = len(self.feature_spec)
+        self.feature_groups = []
+        for group in givens.feature_groups:
+            featureSet = set()
+            for f in group:
+                if f < n:
+                    featureSet.add(f)
+                else:
+                    logger.warning(
+                        f'Feature {f} (referenced in feature groups) '
+                        'is not in our feature spec!')
+            if featureSet:
+                self.feature_groups.append(featureSet)
+            else:
+                logger.warning('Dropping empty feature group!')
+    
+    def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
+        
+        if data is None:
+            data = node.data
+        
+        if y is None:
+            y = node.y
+        
+        if self.only_use_training_to_generate:
+            g_data = data[:node.n_training, :]
+            g_y = y[:node.n_training, :]
+        else:
+            g_data = data
+            g_y = y
+        
+        if self.only_use_training_to_score:
+            s_data = data[:node.n_training, :]
+            s_y = y[:node.n_training, :]
+        else:
+            s_data = data
+            s_y = y
+        
+        all_constraint_candidates = list(
+            generate_atomic_constraints(g_data, g_y, feature_spec=self.feature_spec, one_sided = True))
+
+        if not all_constraint_candidates:
+            logger.error('There were no constraint candidates for building a split!')
+            return None # Or should this be an exception?
+
+        # Will record best split
+        best_split = None
+        best_split_score = 0
+
+        # For each feature group
+        for feature_group in self.feature_groups:
+            
+            # See if this beats best group-level winner
+            winner = self._group_constraints_search(node, s_data, s_y, all_constraint_candidates, feature_group)
+            if winner.score > best_split_score:
+                best_split_score = winner.score
+                best_split = BinarySplit(winner.item)
+
+        return best_split
+    
+    def _group_constraints_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+
+        if self.search_mode == 'm_of_n':
+            return self._m_of_n_split_search(node, s_data, s_y, all_constraint_candidates, feature_group)
+        if self.search_mode == 'groups':
+            return self._groups_split_search(node, s_data, s_y, all_constraint_candidates, feature_group)
+
+        raise ValueError(f'Invalid search mode "{self.search_mode}"')        
+
+    def _groups_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+
+        # Get best atomic split for each feature in the group
+        try:
+            best_constraint_scores = {}
+            for constraint in all_constraint_candidates:
+                f = constraint.feature
+                if f in feature_group:
+                    score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y)
+                    if f not in best_constraint_scores or best_constraint_scores[f].score < score:
+                        best_constraint_scores[f] = ScoredItem(
+                            score=score,
+                            item=constraint)
+
+            starting_constraint_dict = {feat: si.item for feat, si in best_constraint_scores.items()}
+
+        except:
+            logger.debug('Failure in group split search')
+            logger.debug(f'Feature group: {feature_group}')
+            logger.debug(f'Constraint candidates: {all_constraint_candidates}')
+            raise
+
+        best = ScoredItem(score = 0, item = None)
+
+        def score_cd(m, constraint_dict):
+            constraint = MofN(m, list(constraint_dict.values()))
+            return ScoredItem(
+                score = self.split_scorer.score(
+                    node,
+                    BinarySplit(constraint),
+                    s_data, s_y),
+                item = constraint)
+
+        # For each m-value
+        for m in range(len(feature_group)+1):
+
+            # Start with constraint thresholds based on best atomic splits
+            best_constraint_dict = starting_constraint_dict.copy()
+
+            best_for_m = score_cd(m, best_constraint_dict)
+            
+            prev_constraint_dict = {}
+            # Greedy search 1-feature threshold changes
+            while best_constraint_dict != prev_constraint_dict:
+                prev_constraint_dict = best_constraint_dict
+                for feature in feature_group:
+                    for constraint in all_constraint_candidates:
+                        if constraint.feature == feature and constraint != best_constraint_dict[feature]:
+                            candidate_constraint_dict = best_constraint_dict.copy()
+                            candidate = score_cd(m, candidate_constraint_dict)
+                            if candidate > best_for_m:
+                                best_for_m = candidate
+                                best_constraint_dict = candidate_constraint_dict
+            
+            # Remember best
+            if best_for_m > best:
+                best = best_for_m
+
+        return best
+
+    def _m_of_n_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+
+        # Filter constraint candidates to those within the group
+        constraint_candidates = [c for c in all_constraint_candidates if c.feature in feature_group]
+
+        # Initialize beam
+        prev_beam = []
+        beam = []
+        for constraint in constraint_candidates:
+            new_scored_constraint = ScoredItem(
+                    score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y),
+                    item = constraint)
+
+            if len(beam) < self.beam_width:
+                heapq.heappush(beam, new_scored_constraint)
+            else:
+                heapq.heappushpop(beam, new_scored_constraint)
+
+        # Beam search
+        while beam != prev_beam:
+            logger.debug(f'm-of-n beam search beam: {beam}')
+            prev_beam = beam.copy()
+
+            # Trick to iterate over a past snapshot of the beam while modifying the real thing
+            for scored_constraint in prev_beam:
+                for new_constraint in MofN.neighboring_tests(scored_constraint.item, constraint_candidates):
+                    if self.tests_sig_diff(scored_constraint.item, new_constraint, s_data, s_y):
+                        new_score = self.split_scorer.score(node, BinarySplit(new_constraint), s_data, s_y)
+
+                        new_scored_constraint = ScoredItem(score = new_score, item = new_constraint)
+
+                        if len(beam) < self.beam_width:
+                            heapq.heappush(beam, new_scored_constraint)
+                        else:
+                            heapq.heappushpop(beam, new_scored_constraint)
+            
+        # TODO: literal pruning (see pages 57-58)
+
+        return max(beam)
+
+    def tests_sig_diff(self, constraint_a, constraint_b, x, y):
+
+        # TODO: check if this test should use y-values, and if so, how?
+        #hard_y = y.argmax(axis=0)
+        a_branch = np.apply_along_axis(constraint_a.test, axis=1, arr=x)
+        b_branch = np.apply_along_axis(constraint_b.test, axis=1, arr=x)
+
+        freq = np.array(
+            [[sum(a_branch), sum(~a_branch)],
+            [sum(b_branch), sum(~b_branch)]]) + 1 # Smoothing for 0s
+        
+        _, p, _, _ = chi2_contingency(observed=freq)
+
+        return p < self.alpha

@@ -122,6 +122,8 @@ class MofN(Constraint):
     class SearchOperator(Flag):
         INC_M = auto()
         INC_N = auto()
+        DEC_M = auto()
+        DEC_N = auto()
         INC_NM = INC_N | INC_M
 
     def __init__(self, m: int, constraints):
@@ -208,15 +210,19 @@ class MofN(Constraint):
         
         for operator in search_operators:
 
-            new_m = constraint.m_to_satisfy + \
-                (1 if operator & MofN.SearchOperator.INC_M else 0)
+            new_m = constraint.m_to_satisfy + (
+                1 if operator & MofN.SearchOperator.INC_M else (
+                    -1 if operator & MofN.SearchOperator.DEC_M else 0))
 
             if operator & MofN.SearchOperator.INC_N:
                 for atom in constraint_candidates:
                     new_atoms = constraint.constraints + (atom,)
-
                     yield MofN(new_m, new_atoms)
-            
+
+            elif operator & MofN.SearchOperator.DEC_N:
+                atoms = list(constraint.constraints)
+                for atom in atoms:
+                    yield MofN(new_m, tuple(atoms - {atom}))
             else:
                 yield MofN(new_m, constraint.constraints)
         
