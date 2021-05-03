@@ -9,9 +9,16 @@ Welcome to generalizedtrees's documentation!
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-   
-   generalizedtrees
 
+   intro
+   generalizedtrees
+   license
+
+
+Contact
+=======
+Contact us through the `project page on GitHub
+<https://github.com/Craven-Biostat-Lab/generalizedtrees/>`_
 
 
 Indices and tables
