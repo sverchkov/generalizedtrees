@@ -4,3 +4,5 @@
 __version__ = '1.2.0'
 __author__ = 'Yuriy Sverchkov'
 __license__ = 'BSD (3 clause)'
+
+from generalizedtrees.learn import GreedyTreeLearner
