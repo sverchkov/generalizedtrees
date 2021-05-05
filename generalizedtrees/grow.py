@@ -149,13 +149,16 @@ class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
                 child.n_training = idx[0:node.n_training].sum()
                 pregen_data = node.data[idx, :]
 
-                child.data_factory = node.data_factory.refit(pregen_data[0:child.n_training, :])
+                if (pregen_data.shape[0] < self.min_samples):
+                    child.data_factory = node.data_factory.refit(pregen_data[0:child.n_training, :])
 
-                gen_data = child.data_factory.generate(self.min_samples - pregen_data.shape[0])
-                if gen_data.shape[0] < 1:
-                    gen_y = np.empty((0, node.y.shape[1]))
-                else:
+                    gen_data = child.data_factory.generate(self.min_samples - pregen_data.shape[0])
                     gen_y = self.oracle(gen_data)
+
+                else:
+                    child.data_factory = node.data_factory
+                    gen_data = np.empty((0, pregen_data.shape[1]))
+                    gen_y = np.empty((0, node.y.shape[1]))
 
                 child.data = np.row_stack((pregen_data, gen_data))
                 child.y = np.row_stack((node.y[idx, :], gen_y))

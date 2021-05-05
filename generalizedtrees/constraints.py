@@ -126,19 +126,29 @@ class MofN(Constraint):
         DEC_N = auto()
         INC_NM = INC_N | INC_M
 
-    def __init__(self, m: int, constraints):
+    def __init__(self, m: int, constraints, reduce: bool = True):
+        """
+        Create an m-of-n constraint given an integer m and n constraints.
+        
+        :param m: Number of constraints to specify
+        :type m: int
+        :param constraints: The set of constraints
+        :param reduce: Whether to reduce complementary constraints (default True)
+        :type reduce: bool
+        """
 
         constraints_list = list(constraints)
 
-        # Check for pairs of constraints that cancel each other out
-        for i, c1 in enumerate(constraints):
-            for c2 in constraints[i+1:]:
-                if c1 == ~c2:
-                    constraints_list.remove(c1)
-                    constraints_list.remove(c2)
-                    m -= 1
+        if reduce:
+            # Check for pairs of constraints that cancel each other out
+            for i, c1 in enumerate(constraints):
+                for c2 in constraints[i+1:]:
+                    if c1 == ~c2:
+                        constraints_list.remove(c1)
+                        constraints_list.remove(c2)
+                        m -= 1
 
-        # TODO: Check if any of the constraints subsume each other
+            # TODO: Check if any of the constraints subsume each other
 
         self._constraints = tuple(constraints_list)
         self._m = m

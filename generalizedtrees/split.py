@@ -783,7 +783,7 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         best = ScoredItem(score = 0, item = None)
 
         def score_cd(m, constraint_dict):
-            constraint = MofN(m, list(constraint_dict.values()))
+            constraint = MofN(m, constraint_dict.values(), reduce=False)
             return ScoredItem(
                 score = self.split_scorer.score(
                     node,
