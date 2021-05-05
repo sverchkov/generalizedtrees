@@ -19,8 +19,8 @@ Dataset = namedtuple(
 
 def mk_data():
 
-    x_train = np.random.randint(2, size=(500, 1000)).astype(bool)
-    x_test = np.random.randint(2, size=(500, 1000)).astype(bool)
+    x_train = np.random.randint(2, size=(5000, 1000)).astype(bool)
+    x_test = np.random.randint(2, size=(5000, 1000)).astype(bool)
     y_train = x_train[:, 0:99].sum(axis=1) > x_train[:, 200:299].sum(axis=1)
     y_test = x_test[:, 0:99].sum(axis=1) > x_test[:, 200:299].sum(axis=1)
 
