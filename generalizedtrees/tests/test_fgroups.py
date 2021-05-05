@@ -76,7 +76,7 @@ def test_fgroups_method_bin_data(small_weights_data, small_weights_model, caplog
     logger.info("Creating explainer object")
 
     explainer = learn.GreedyTreeLearner()
-    explainer.builder.splitter = split.GroupSplitConstructorLC(search_mode='groups')
+    explainer.builder.splitter = split.GroupSplitConstructorLC(search_mode='groups_fast')
     explainer.builder.splitter.only_use_training_to_generate = True
     explainer.builder.splitter.only_use_training_to_score = False
     explainer.givens = givens.DataWithOracleGivensLC()

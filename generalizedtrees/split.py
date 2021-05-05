@@ -659,21 +659,27 @@ class MofNSplitConstructorLC(SplitConstructorLC):
 
 class GroupSplitConstructorLC(SplitConstructorLC):
 
-    SUPPORTED_SEARCH_MODES = ('m_of_n', 'groups')
+    SUPPORTED_SEARCH_MODES = ('m_of_n', 'groups', 'groups_fast')
 
     def __init__(
         self,
         beam_width = 2,
         alpha = 0.05,
-        search_mode = 'm_of_n'
+        search_mode = 'm_of_n',
     ) -> None:
+
+        self.search_group_thresholds = True # Default value, changed if needed
 
         self.beam_width: int = beam_width
         self.alpha: float = alpha
 
         # Validate search mode
         if search_mode in GroupSplitConstructorLC.SUPPORTED_SEARCH_MODES:
-            self.search_mode = search_mode
+            if search_mode == 'groups_fast':
+                self.search_mode = 'groups'
+                self.search_group_thresholds = False
+            else:
+                self.search_mode = search_mode
         else:
             raise ValueError(
                 f'Unsupported search mode "{search_mode}", '
@@ -760,6 +766,8 @@ class GroupSplitConstructorLC(SplitConstructorLC):
 
     def _groups_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
 
+        logger.debug('Building constraint set for group')
+
         # Get best atomic split for each feature in the group
         try:
             best_constraint_scores = {}
@@ -794,23 +802,27 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         # For each m-value
         for m in range(len(feature_group)+1):
 
+            logger.debug(f'Evaluating group constraint with m={m}')
+
             # Start with constraint thresholds based on best atomic splits
             best_constraint_dict = starting_constraint_dict.copy()
 
             best_for_m = score_cd(m, best_constraint_dict)
             
-            prev_constraint_dict = {}
-            # Greedy search 1-feature threshold changes
-            while best_constraint_dict != prev_constraint_dict:
-                prev_constraint_dict = best_constraint_dict
-                for feature in feature_group:
-                    for constraint in all_constraint_candidates:
-                        if constraint.feature == feature and constraint != best_constraint_dict[feature]:
-                            candidate_constraint_dict = best_constraint_dict.copy()
-                            candidate = score_cd(m, candidate_constraint_dict)
-                            if candidate > best_for_m:
-                                best_for_m = candidate
-                                best_constraint_dict = candidate_constraint_dict
+            if self.search_group_thresholds:
+                prev_constraint_dict = {}
+                # Greedy search 1-feature threshold changes
+                while best_constraint_dict != prev_constraint_dict:
+                    prev_constraint_dict = best_constraint_dict
+                    for feature in feature_group:
+                        for constraint in all_constraint_candidates:
+                            if constraint.feature == feature and constraint != best_constraint_dict[feature]:
+                                candidate_constraint_dict = best_constraint_dict.copy()
+                                candidate_constraint_dict[feature] = constraint
+                                candidate = score_cd(m, candidate_constraint_dict)
+                                if candidate > best_for_m:
+                                    best_for_m = candidate
+                                    best_constraint_dict = candidate_constraint_dict
             
             # Remember best
             if best_for_m > best:
