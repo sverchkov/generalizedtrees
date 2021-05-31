@@ -768,6 +768,8 @@ class GroupSplitConstructorLC(SplitConstructorLC):
 
         logger.debug('Building constraint set for group')
 
+        best = ScoredItem(score = 0, item = None)
+
         # Get best atomic split for each feature in the group
         try:
             best_constraint_scores = {}
@@ -776,9 +778,11 @@ class GroupSplitConstructorLC(SplitConstructorLC):
                 if f in feature_group:
                     score = self.split_scorer.score(node, BinarySplit(constraint), s_data, s_y)
                     if f not in best_constraint_scores or best_constraint_scores[f].score < score:
-                        best_constraint_scores[f] = ScoredItem(
+                        new_best = ScoredItem(
                             score=score,
                             item=constraint)
+                        best_constraint_scores[f] = new_best
+                        if new_best > best: best = new_best # This adds single-feature constraints as candidates
 
             starting_constraint_dict = {feat: si.item for feat, si in best_constraint_scores.items()}
 
@@ -787,8 +791,6 @@ class GroupSplitConstructorLC(SplitConstructorLC):
             logger.debug(f'Feature group: {feature_group}')
             logger.debug(f'Constraint candidates: {all_constraint_candidates}')
             raise
-
-        best = ScoredItem(score = 0, item = None)
 
         def score_cd(m, constraint_dict):
             constraint = MofN(m, constraint_dict.values(), reduce=False)
