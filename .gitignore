@@ -12,3 +12,6 @@ venv
 build
 dist
 generalizedtrees.egg-info
+
+# Doc building
+docs/_build
