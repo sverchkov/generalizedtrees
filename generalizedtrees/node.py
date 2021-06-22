@@ -15,32 +15,39 @@ from generalizedtrees.split import SplitTest
 from generalizedtrees.util import order_by
 
 
-# Interface definition:
-class NodeI(Protocol):
+# Base definition:
+class NodeBase:
 
-    data: np.ndarray
-    y: np.ndarray
-    local_constraint: Optional[Constraint] = None
-    model: Optional[LocalEstimator] = None
-    split: Optional[SplitTest] = None
-
-# Implementations
+    def __init__(self):
+        self.data: np.ndarray
+        self.y: np.ndarray
+        self.local_constraint: Optional[Constraint] = None
+        self.model: Optional[LocalEstimator] = None
+        self.split: Optional[SplitTest] = None
+        self.node_number: Optional[int] = None
 
 # Supervised classification node adds nothing to the base interface
-class Node(NodeI):
-    pass
+class Node(NodeBase):
+    def __init__(self) -> None:
+        super().__init__()
 
 # Model translation node
-class MTNode(NodeI):
+class MTNode(NodeBase):
 
-    n_training: int
-    coverage: float # Training set coverage
-    constraints: Tuple[Constraint, ...]
-    data_factory: DataFactoryLC
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.n_training: int
+        self.coverage: float # Training set coverage
+        self.constraints: Tuple[Constraint, ...]
+        self.data_factory: DataFactoryLC
 
 # Trepan node
 @order_by('score')
 class TrepanNode(MTNode):
+
+    def __init__(self) -> None:
+        super().__init__()
 
     @cached_property
     def score(self):

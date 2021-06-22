@@ -10,7 +10,7 @@ from generalizedtrees.givens import DataWithOracleGivensLC, GivensLC, Supervised
 from generalizedtrees.leaves import LocalEstimator
 
 import numpy as np
-from generalizedtrees.node import MTNode, Node, NodeI
+from generalizedtrees.node import MTNode, Node, NodeBase
 from typing import Callable, Generic, Iterable, Optional, Protocol, Type, TypeVar
 
 from generalizedtrees.queues import CanPushPop
@@ -23,7 +23,7 @@ from generalizedtrees.tree import Tree
 # Node builder components #
 ###########################
 
-N = TypeVar('N', bound=NodeI)
+N = TypeVar('N', bound=NodeBase)
 
 # Interface definition
 class NodeBuilderLC(Protocol, Generic[N]):
@@ -202,15 +202,23 @@ class GreedyBuilderLC:
 
     def build_tree(self) -> Tree:
 
+        # Init root
         root = self.node_builder.create_root()
         tree = Tree([root])
 
+        # Init queue
         queue = self.new_queue()
         queue.push((root, 'root'))
 
+        # Init node expansion order tracking
+        node_number: int = 0
+
+        # Queue-order expansion:
         while queue and not self.global_stop.check(tree):
 
             node, ptr = queue.pop()
+            node.node_number = node_number
+            node_number += 1
 
             if not self.local_stop.check(tree.node(ptr)):
 

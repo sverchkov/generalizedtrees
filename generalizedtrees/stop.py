@@ -4,24 +4,22 @@
 # Copyright (c) 2020, Yuriy Sverchkov
 
 
-from abc import abstractmethod
-from logging import getLogger
+from abc import abstractmethod, ABC
+from logging import getLogger, Logger
 from typing import Iterable, Protocol
 
 from generalizedtrees.tree import Tree
 
-logger = getLogger()
+logger: Logger = getLogger()
 
 # Stopping criteria learner components:
 
 ## Interface definitions
-
 class LocalStopLC(Protocol):
 
     @abstractmethod
     def check(self, node) -> bool:
         raise NotImplementedError
-
 
 class GlobalStopLC(Protocol):
 
@@ -103,22 +101,20 @@ class NeverStopLC(LocalStopLC, GlobalStopLC):
 
 class LocalStopDepthLC(LocalStopLC):
 
-    depth: int
-
-    def __init__(self, max_depth):
-        self.depth = max_depth
+    def __init__(self, max_depth: int):
+        self.depth: int = max_depth
     
     def check(self, node):
-        return node.depth >= self.depth
+        if node.depth >= self.depth:
+            logger.debug(f'Local stopping criterion met: node depth {node.depth} meets depth limit {self.depth}')
+            return True
+        return False
 
 class LocalStopSaturation(LocalStopLC):
 
-    saturation: float = 1
-    training_only: bool = False
-
     def __init__(self, saturation: float = 1, training_only: bool = False):
-        self.saturation = saturation
-        self.training_only = training_only
+        self.saturation: float = saturation
+        self.training_only: bool = training_only
 
     def check(self, node) -> bool:
         item = node.item
@@ -126,6 +122,7 @@ class LocalStopSaturation(LocalStopLC):
         if self.training_only:
             if hasattr(item, 'n_training'):
                 if item.n_training <= 1:
+                    logger.debug(f'Local stopping criterion met: {item.n_training} samples for saturation test.')
                     return True
                 else:
                     y = item.y[:item.n_training, :]
@@ -135,7 +132,13 @@ class LocalStopSaturation(LocalStopLC):
                     'used with model translation, but is being used with node objects that '
                     'do not support it.')
 
-        return y.mean(axis=0).max() >= self.saturation
+        saturation = y.mean(axis=0).max()
+
+        if saturation >= self.saturation:
+            logger.debug(f'Local stopping criterion met: node saturation={saturation} meets threshold={self.saturation}.')
+            return True
+
+        return False
 
 
 
@@ -143,10 +146,12 @@ class LocalStopSaturation(LocalStopLC):
 
 class GlobalStopTreeSizeLC(GlobalStopLC):
 
-    size: int
-
     def __init__(self, max_size):
-        self.size = max_size
+        self.size: int = max_size
     
     def check(self, tree: Tree):
-        return len(tree) >= self.size
+        size = len(tree)
+        if size >= self.size:
+            logger.debug(f'Global stopping criterion met: tree size {size} meets size limit {self.size}.')
+            return True
+        return False
