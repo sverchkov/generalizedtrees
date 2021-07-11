@@ -6,7 +6,7 @@
 from abc import abstractmethod
 from enum import Enum, Flag, auto
 from functools import reduce
-from typing import Iterable, Protocol, NamedTuple, Any, Union, runtime_checkable
+from typing import Iterable, Optional, Protocol, NamedTuple, Any, Sequence, Union, runtime_checkable
 import numpy as np
 
 
@@ -126,7 +126,7 @@ class MofN(Constraint):
         DEC_N = auto()
         INC_NM = INC_N | INC_M
 
-    def __init__(self, m: int, constraints, reduce: bool = True):
+    def __init__(self, m: int, constraints: Sequence[Constraint], reduce: bool = True, group_label: Optional[str] = None):
         """
         Create an m-of-n constraint given an integer m and n constraints.
         
@@ -150,8 +150,9 @@ class MofN(Constraint):
 
             # TODO: Check if any of the constraints subsume each other
 
-        self._constraints = tuple(constraints_list)
-        self._m = m
+        self._constraints: Sequence[Constraint] = tuple(constraints_list)
+        self._m: int = m
+        self.group_label: Optional[str] = group_label
 
 
     @property
@@ -199,6 +200,8 @@ class MofN(Constraint):
         return self._m > 1
     
     def __str__(self) -> str:
+        if self.group_label is not None:
+            return f'{self.m_to_satisfy} of {self.group_label}'
         return f'{self.m_to_satisfy} of {[str(c) for c in self.constraints]}'
 
     def __repr__(self) -> str:

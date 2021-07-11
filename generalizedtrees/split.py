@@ -692,24 +692,27 @@ class GroupSplitConstructorLC(SplitConstructorLC):
     def initialize(self, givens: GivensLC) -> None:
         # Being explicit about what we're using from givens
         self.feature_spec = givens.feature_spec
-        self.feature_groups = givens.feature_groups
+        if not isinstance(givens.feature_groups, dict):
+            feature_groups = {f'group {k}': v for k, v in enumerate(givens.feature_groups)}
+        else:
+            feature_groups = givens.feature_groups
 
         # Verify that all features in the groups are in the spec
         n = len(self.feature_spec)
-        self.feature_groups = []
-        for group in givens.feature_groups:
+        self.feature_groups = {}
+        for group, members in feature_groups.items():
             featureSet = set()
-            for f in group:
+            for f in members:
                 if f < n:
                     featureSet.add(f)
                 else:
                     logger.warning(
-                        f'Feature {f} (referenced in feature groups) '
+                        f'Feature {f} (referenced in feature group "{group}") '
                         'is not in our feature spec!')
             if featureSet:
-                self.feature_groups.append(featureSet)
+                self.feature_groups[group] = featureSet
             else:
-                logger.warning('Dropping empty feature group!')
+                logger.warning(f'Dropping empty feature group "{group}"!')
     
     def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
         
@@ -745,26 +748,26 @@ class GroupSplitConstructorLC(SplitConstructorLC):
         best_split_score = 0
 
         # For each feature group
-        for feature_group in self.feature_groups:
+        for group_label, feature_group in self.feature_groups.items():
             
             # See if this beats best group-level winner
-            winner = self._group_constraints_search(node, s_data, s_y, all_constraint_candidates, feature_group)
+            winner = self._group_constraints_search(node, s_data, s_y, all_constraint_candidates, feature_group, group_label)
             if winner.score > best_split_score:
                 best_split_score = winner.score
                 best_split = BinarySplit(winner.item)
 
         return best_split
     
-    def _group_constraints_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+    def _group_constraints_search(self, node, s_data, s_y, all_constraint_candidates, feature_group, group_label='UNLABELED GROUP') -> ScoredItem:
 
         if self.search_mode == 'm_of_n':
-            return self._m_of_n_split_search(node, s_data, s_y, all_constraint_candidates, feature_group)
+            return self._m_of_n_split_search(node, s_data, s_y, all_constraint_candidates, feature_group, group_label)
         if self.search_mode == 'groups':
-            return self._groups_split_search(node, s_data, s_y, all_constraint_candidates, feature_group)
+            return self._groups_split_search(node, s_data, s_y, all_constraint_candidates, feature_group, group_label)
 
         raise ValueError(f'Invalid search mode "{self.search_mode}"')        
 
-    def _groups_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+    def _groups_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group, group_label) -> ScoredItem:
 
         logger.debug('Building constraint set for group')
 
@@ -793,7 +796,7 @@ class GroupSplitConstructorLC(SplitConstructorLC):
             raise
 
         def score_cd(m, constraint_dict):
-            constraint = MofN(m, constraint_dict.values(), reduce=False)
+            constraint = MofN(m, constraint_dict.values(), reduce=False, group_label=group_label)
             return ScoredItem(
                 score = self.split_scorer.score(
                     node,

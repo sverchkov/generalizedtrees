@@ -119,7 +119,7 @@ class DataWithOracleGivensLC(GivensLC):
             used, or a function that takes data and outputs a prediction (in matrix form).
         :param: target_names - The names of the target classes/components.
         :param: prelabel_data - Whether to run the oracle on the data first, before building the model
-        :param: feature_groups - Used in some explanation configurations - A list of lists of feature indeces
+        :param: feature_groups - Used in some explanation configurations - A list or dict of lists of feature indeces
             representing semantically meaningful feature groups
         """
 
