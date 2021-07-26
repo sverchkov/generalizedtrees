@@ -1,7 +1,7 @@
 # Licensed under the BSD 3-Clause License
 # Copyright (c) 2020, Yuriy Sverchkov
 
-__version__ = '1.3.0'
+__version__ = '1.4.0'
 __author__ = 'Yuriy Sverchkov'
 __license__ = 'BSD (3 clause)'
 

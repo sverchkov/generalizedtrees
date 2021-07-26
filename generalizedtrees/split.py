@@ -281,9 +281,9 @@ def generate_fayyad_thresholds(
             # Only place splits between distinct y-values
             if x_collision or np.any(y_prev != y):
                 split_point = (x_prev + x)/2
-                yield SimpleConstraint(feature_index, Op.LEQ, split_point)
                 if not one_sided:
-                    yield SimpleConstraint(feature_index, Op.GT, split_point)
+                    yield SimpleConstraint(feature_index, Op.LEQ, split_point)
+                yield SimpleConstraint(feature_index, Op.GT, split_point)
             # Reset collision flag when advancing in x-space
             x_collision = False
         else:
@@ -303,7 +303,7 @@ def generate_eq_constraints(feature_vector: np.ndarray, feature_index: int, all_
     """
 
     values = np.unique(feature_vector)
-    if all_but_one and len(values) > 1: values = values[:-1]
+    if all_but_one and len(values) > 1: values = values[1:]
 
     for x in values:
         yield SimpleConstraint(feature_index, Op.EQ, x)
