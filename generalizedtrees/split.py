@@ -166,7 +166,7 @@ def fayyad_thresholds(feature_vector, feature_index, target_matrix):
     v = sorted(zip(feature_vector, target_matrix), key=itemgetter(0))
     
     # Flag for handling the case when two identical x-values have distinct y-values
-    x_collision = False
+    y_collision = False
 
     for j in range(1, len(v), 1):
         x_prev, y_prev = v[j-1]
@@ -175,15 +175,15 @@ def fayyad_thresholds(feature_vector, feature_index, target_matrix):
         # Only place splits between distinct x-values
         if x_prev < x:
             # Only place splits between distinct y-values
-            if x_collision or np.any(y_prev != y):
+            if y_collision or np.any(y_prev != y):
                 split_point = (x_prev + x)/2
                 yield SplitGT(feature_index, split_point)
             # Reset collision flag when advancing in x-space
-            x_collision = False
+            y_collision = False
         else:
             # Detect y-collision
             if np.any(y_prev != y):
-                x_collision = True
+                y_collision = True
 
 
 def one_vs_all(feature_vector, feature_index):
@@ -270,7 +270,7 @@ def generate_fayyad_thresholds(
     v = sorted(zip(feature_vector, target_matrix), key=itemgetter(0))
     
     # Flag for handling the case when two identical x-values have distinct y-values
-    x_collision = False
+    y_collision = False
 
     for j in range(1, len(v), 1):
         x_prev, y_prev = v[j-1]
@@ -279,17 +279,17 @@ def generate_fayyad_thresholds(
         # Only place splits between distinct x-values
         if x_prev < x:
             # Only place splits between distinct y-values
-            if x_collision or np.any(y_prev != y):
+            if y_collision or np.any(y_prev != y):
                 split_point = (x_prev + x)/2
                 if not one_sided:
                     yield SimpleConstraint(feature_index, Op.LEQ, split_point)
                 yield SimpleConstraint(feature_index, Op.GT, split_point)
             # Reset collision flag when advancing in x-space
-            x_collision = False
+            y_collision = False
         else:
             # Detect y-collision
             if np.any(y_prev != y):
-                x_collision = True
+                y_collision = True
 
 
 def generate_eq_constraints(feature_vector: np.ndarray, feature_index: int, all_but_one: bool) -> Iterable[Constraint]:
@@ -355,7 +355,7 @@ class ProbabilityImpurityLC(SplitScoreLC):
     def __init__(self, impurity: str = 'gini') -> None:
         if impurity == 'gini':
             self.impurity = scores.gini_of_p_matrix
-            self.weighted_avg = False
+            self.weighted_avg = True
         else: #information gain
             self.impurity = scores.entropy_of_p_matrix
             self.weighted_avg = True

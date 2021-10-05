@@ -24,7 +24,7 @@ def gini_of_p_matrix(pm: np.ndarray):
 
     p = pm.mean(axis=0)
 
-    return 1 - np.sum(p*p)
+    return np.sum(p * (1 - p))
 
 
 def entropy_of_label_column(y):
