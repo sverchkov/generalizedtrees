@@ -294,4 +294,4 @@ def test(constraints: Iterable[Constraint], data_matrix):
 
     n, _ = data_matrix.shape
 
-    return reduce(np.multiply, map(lambda c: c.test_matrix(data_matrix), constraints), np.ones(n, dtype=np.bool))
+    return reduce(np.multiply, map(lambda c: c.test_matrix(data_matrix), constraints), np.ones(n, dtype=bool))

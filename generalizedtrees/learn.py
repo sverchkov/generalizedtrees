@@ -5,40 +5,34 @@
 
 from typing import Callable
 from logging import getLogger
+from generalizedtrees.vis.text import TreePrinter
 
 import numpy as np
 from pandas import DataFrame
 
 from generalizedtrees.givens import GivensLC
 from generalizedtrees.grow import GreedyBuilderLC, NodeBuilderLC
-from generalizedtrees.predict import PredictorLC
+from generalizedtrees.predict import PredictorLC, PredictorTree
 from generalizedtrees.queues import CanPushPop
 from generalizedtrees.split import SplitCandidateGeneratorLC, SplitScoreLC
 from generalizedtrees.stop import GlobalStopLC, LocalStopLC
-from generalizedtrees.tree import Tree, tree_to_str
-
 
 logger = getLogger()
 
 
 class GreedyTreeLearner:
-
-    # Internals
-    tree: Tree
-
-    # Learner components
-    givens: GivensLC
-    builder: GreedyBuilderLC
-    predictor: PredictorLC
     
-    # TODO?
     def __init__(self, *args, **kwargs):
         # TODO: Validation
         # TODO: Set components from input
-        self.builder = GreedyBuilderLC()
+
+        # Learner components
+        self.givens: GivensLC = None
+        self.builder: GreedyBuilderLC = GreedyBuilderLC()
+        self.predictor: PredictorLC = None
+        self.predictor_tree: PredictorTree = None
 
     # Component setters for components that aren't direct attributes
-
     @property
     def local_stop(self) -> LocalStopLC:
         return self.builder.local_stop
@@ -93,6 +87,10 @@ class GreedyTreeLearner:
     @property
     def feature_names(self):
         return self.givens.feature_names
+    
+    @property
+    def tree(self): # Will possibly deprecate
+        return self.predictor_tree.tree
 
     def fit(self, *args, **kwargs):
         
@@ -108,62 +106,33 @@ class GreedyTreeLearner:
         self.builder.initialize(self.givens)
 
         # Build tree
-        self.tree = self.builder.build_tree()
+        tree = self.builder.build_tree()
 
         # Prune tree
-        self.tree = self.builder.prune_tree(self.tree)
+        tree = self.builder.prune_tree(tree)
 
-        return self
+        self.predictor_tree = PredictorTree(tree, self.predictor, TreePrinter())
+
+        return self.predictor_tree
     
     def predict(self, data):
 
-        self._checks_to_predict()
-        data_matrix = self._validate_data(data)
+        if not self.predictor_tree:
+            raise ValueError('Tried to predict without a predictor tree (perhaps fit was not called?)')
 
-        return self.predictor.predict(self.tree, data_matrix)
+        return self.predictor_tree.predict(data)
 
     def predict_proba(self, data):
 
-        self._checks_to_predict()
-        data_matrix = self._validate_data(data)
+        if not self.predictor_tree:
+            raise ValueError('Tried to predict without a predictor tree (perhaps fit was not called?)')
 
-        return self.predictor.predict_proba(self.tree, data_matrix)
+        return self.predictor_tree.predict_proba(data)
 
-    def _validate_data(self, data) -> np.ndarray:
-
-        # TODO: more validation
-
-        if isinstance(data, DataFrame):
-            data = data.to_numpy()
-        
-        return data
-
-    def _checks_to_predict(self) -> None:
-        self._check_tree()
-        self._check_predictor()
-
-    def _check_predictor(self) -> None:
-        try:
-            self.predictor
-        except AttributeError:
-            raise ValueError('No predictor present.')
-
-    def _check_tree(self) -> None:
-        try:
-            self.tree
-        except AttributeError:
-            raise ValueError('Tried to predict before learning the tree.')
-    
     def show_tree(self):
+        # Candidate for deprecation?
 
-        def show_node(node_obj):
-            if node_obj.split is None:
-                if node_obj.model is None:
-                    logger.critical('Malformed node encountered in tree printing.')
-                    return "Malformed node"
-                else:
-                    return str(node_obj.model)
-            else:
-                return str(node_obj.split)
+        if not self.predictor_tree:
+            return 'No tree learned.'
 
-        return tree_to_str(self.tree, show_node)
+        return self.predictor_tree.show()

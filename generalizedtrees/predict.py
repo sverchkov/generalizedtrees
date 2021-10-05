@@ -5,9 +5,11 @@
 
 from abc import abstractmethod
 from generalizedtrees.givens import GivensLC
-from typing import Protocol
+from generalizedtrees.vis.text import TreePrinter
+from typing import Optional, Protocol
 
 import numpy as np
+import pandas as pd
 
 from generalizedtrees.tree import Tree
 
@@ -45,7 +47,7 @@ def estimate(tree: Tree, data_matrix, target_dimension):
         np.arange(n, dtype=np.intp),
         np.empty(
             (n, target_dimension),
-            dtype=np.float))
+            dtype=float))
 
 
 # Predictor Learner Component:
@@ -59,8 +61,8 @@ class PredictorLC(Protocol):
     It correctly routes (and if needed transforms) the estimates obtained from the leaf estimators
     to outputs of the predict and predict_proba methods.
 
-    It is assumed that set_target_names will be called to help determine the output shape before
-    prediction is attempted. Typically, set_target_names will be called during fitting.
+    It is assumed that `initialize` will be called to help determine the output shape before
+    prediction is attempted. Typically, `initialize` will be called during fitting.
     """
 
     @abstractmethod
@@ -142,3 +144,37 @@ class BinaryClassifierLC(BaseClassifierLC):
         proba = np.concatenate((1 - p_1, p_1), axis=1)
 
         return proba
+
+# Predictor tree:
+
+class PredictorTree:
+    """
+    Class for decoupling the tree and predictor from the rest of the learning-specific objects
+    """
+
+    def __init__(self, tree: Tree, predictor: PredictorLC, printer: Optional[TreePrinter] = None) -> None:
+        self.tree: Tree = tree
+        self.predictor: PredictorLC = predictor
+        self.printer: TreePrinter = printer
+    
+    def predict(self, data):
+        data_matrix = self._validate_data(data)
+        return self.predictor.predict(self.tree, data_matrix)
+    
+    def predict_proba(self, data):
+        data_matrix = self._validate_data(data)
+        return self.predictor.predict_proba(self.tree, data_matrix)
+    
+    def show(self):
+        return self.printer.show(self.tree)
+    
+    def _validate_data(self, data) -> np.ndarray:
+
+        # TODO: more validation
+
+        if isinstance(data, pd.DataFrame):
+            data = data.to_numpy()
+        
+        return data
+
+

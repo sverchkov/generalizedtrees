@@ -27,17 +27,17 @@ def test_bat(breast_cancer_data_pandas, breast_cancer_rf_model, caplog):
 
     logger.info('Fitting tree')
     oracle = model.predict_proba
-    explain.fit(x_train, oracle)
+    tree = explain.fit(x_train, oracle)
 
     t2 = perf_counter()
 
     logger.info(f'Time taken: {t2-t1}')
 
-    logger.info(f'Learned tree:\n{explain.show_tree()}')
+    logger.info(f'Learned tree:\n{tree.show()}')
 
     # Make predictions
     logger.info('Running prediction')
-    explainer_predictions = explain.predict(x_test)
+    explainer_predictions = tree.predict(x_test)
 
     logger.info(f'Predictions: {list(explainer_predictions)}')
 

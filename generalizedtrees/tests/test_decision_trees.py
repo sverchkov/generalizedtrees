@@ -21,12 +21,12 @@ def test_dtc(breast_cancer_data, caplog):
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
 
-    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, feature_spec=(FeatureSpec.CONTINUOUS,)*d)
+    dtc_result = dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, feature_spec=(FeatureSpec.CONTINUOUS,)*d)
 
-    logger.info(f'Learned tree:\n{dtc.show_tree()}')
+    logger.info(f'Learned tree:\n{dtc_result.show()}')
 
     logger.info("Running prediction")
-    dtc.predict(breast_cancer_data.x_test)
+    dtc_result.predict(breast_cancer_data.x_test)
 
     logger.info("Done")
 
@@ -48,12 +48,12 @@ def test_dtc_prediction(breast_cancer_data, caplog):
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
 
-    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, feature_spec=(FeatureSpec.CONTINUOUS,)*d)
+    dtc_result = dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, feature_spec=(FeatureSpec.CONTINUOUS,)*d)
 
-    logger.info(f'Learned tree:\n{dtc.show_tree()}')
+    logger.info(f'Learned tree:\n{dtc_result.show()}')
 
     logger.info("Running prediction")
-    my_pr = dtc.predict(breast_cancer_data.x_test)
+    my_pr = dtc_result.predict(breast_cancer_data.x_test)
 
     logger.info("Running Scikit-Learn's DT")
     sk_dtc = SKDTC(max_depth=5)
@@ -82,12 +82,12 @@ def test_dtc_pandas(breast_cancer_data_pandas, caplog):
 
     logger.info("Fitting tree")
 
-    dtc.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
+    dtc_result = dtc.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
 
-    logger.info(f'Learned tree:\n{dtc.show_tree()}')
+    logger.info(f'Learned tree:\n{dtc_result.show()}')
 
     logger.info("Running prediction")
-    dtc.predict(breast_cancer_data_pandas.x_test)
+    dtc_result.predict(breast_cancer_data_pandas.x_test)
 
     logger.info("Done")
 
@@ -100,16 +100,16 @@ def test_dtc_bin_vs_multi(breast_cancer_data_pandas, caplog):
     caplog.set_level(logging.DEBUG)
 
     logger.info("Creating binary version")
-    dtc_bin = binary_decision_tree_classifier(max_depth=5)
-    dtc_bin.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
+    dtc_bin_learner = binary_decision_tree_classifier(max_depth=5)
+    dtc_bin = dtc_bin_learner.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
 
-    logger.info(f'Learned tree:\n{dtc_bin.show_tree()}')
+    logger.info(f'Learned tree:\n{dtc_bin.show()}')
 
     logger.info("Creating general version")
-    dtc_gen = decision_tree_classifier(max_depth=5)
-    dtc_gen.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
+    dtc_gen_learner = decision_tree_classifier(max_depth=5)
+    dtc_gen = dtc_gen_learner.fit(breast_cancer_data_pandas.x_train, breast_cancer_data_pandas.y_train)
 
-    logger.info(f'Learned tree:\n{dtc_gen.show_tree()}')
+    logger.info(f'Learned tree:\n{dtc_gen.show()}')
 
     logger.info('Running predictions')
     bin_prob = dtc_bin.predict_proba(breast_cancer_data_pandas.x_test)

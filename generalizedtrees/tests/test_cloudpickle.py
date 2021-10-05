@@ -32,18 +32,18 @@ def test_trepan_cloudpickle_serialization(breast_cancer_data_pandas, breast_canc
 
     logger.info('Fitting tree')
     oracle = lambda x: model.predict_proba(x)
-    trepan.fit(x_train, oracle)
+    trepan_result = trepan.fit(x_train, oracle)
 
-    tree_str = trepan.show_tree()
+    tree_str = trepan_result.show()
     logger.info(f'Learned tree:\n{tree_str}')
 
     logger.info('Pickling Trepan instance')
-    bytes_obj = cp.dumps(trepan)
+    bytes_obj = cp.dumps(trepan_result)
 
     logger.info('Unpickling Trepan instance')
     returned_tree = cp.loads(bytes_obj)
 
-    returned_tree_str = returned_tree.show_tree()
+    returned_tree_str = returned_tree.show()
     logger.info(f'Unpickled tree:\n{returned_tree_str}')
 
     assert returned_tree_str == tree_str
@@ -67,18 +67,18 @@ def test_composed_dtc_cloudpickle_serialization(breast_cancer_data, caplog):
     logger.info("Fitting tree")
     d = breast_cancer_data.x_train.shape[1]
 
-    dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, feature_spec=(FeatureSpec.CONTINUOUS,)*d)
+    dtc_result = dtc.fit(breast_cancer_data.x_train, breast_cancer_data.y_train, feature_spec=(FeatureSpec.CONTINUOUS,)*d)
 
-    tree_str = dtc.show_tree()
+    tree_str = dtc_result.show()
     logger.info(f'Learned tree:\n{tree_str}')
 
     logger.info('Pickling tree')
-    bytes_obj = cp.dumps(dtc)
+    bytes_obj = cp.dumps(dtc_result)
 
     logger.info('Unpickling tree')
     returned_dtc = cp.loads(bytes_obj)
 
-    returned_tree_str = returned_dtc.show_tree()
+    returned_tree_str = returned_dtc.show()
     logger.info(f'Unpickled tree:\n{returned_tree_str}')
 
     assert returned_tree_str == tree_str
