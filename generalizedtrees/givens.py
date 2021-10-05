@@ -194,7 +194,7 @@ def parse_data(data, feature_names=None, feature_spec=None):
 
     else:
 
-        feature_names = np.arange(m)
+        feature_names = np.array([f'feature {i}' for i in range(m)])
 
     if isinstance(data, np.ndarray):
         data_matrix = data

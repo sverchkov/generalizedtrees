@@ -111,7 +111,7 @@ class GreedyTreeLearner:
         # Prune tree
         tree = self.builder.prune_tree(tree)
 
-        self.predictor_tree = PredictorTree(tree, self.predictor, TreePrinter())
+        self.predictor_tree = PredictorTree(tree, self.predictor, TreePrinter(self.givens.feature_names))
 
         return self.predictor_tree
     
