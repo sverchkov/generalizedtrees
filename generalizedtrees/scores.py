@@ -1,7 +1,7 @@
 # Scoring functions
 #
 # Licensed under the BSD 3-Clause License
-# Copyright (c) 2020, Yuriy Sverchkov
+# Copyright (c) 2020-2021, Yuriy Sverchkov
 
 import numpy as np
 
@@ -49,3 +49,13 @@ def entropy_of_p_vector(p):
     pl2p = np.where(p > 0, - p * np.log2(p, where = p > 0), 0)
 
     return pl2p.sum()
+
+
+def soft_hard_product_loss(y1, y2):
+
+    hard2 = np.eye(y2.shape[1])[y2.argmax(axis=1),:]
+    return 1 - (y1 * hard2).mean(axis=0).sum()
+
+def product_loss(y1, y2):
+    
+    return 1 - (y1 * y2).mean(axis=0).sum()

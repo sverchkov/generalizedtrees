@@ -8,6 +8,9 @@ from abc import abstractmethod, ABC
 from logging import getLogger, Logger
 from typing import Iterable, Protocol
 
+from numpy import ndarray
+
+from generalizedtrees.node import NodeBase
 from generalizedtrees.tree import Tree
 
 logger: Logger = getLogger()
@@ -18,7 +21,7 @@ logger: Logger = getLogger()
 class LocalStopLC(Protocol):
 
     @abstractmethod
-    def check(self, node) -> bool:
+    def check(self, node: NodeBase, data: ndarray, y: ndarray) -> bool:
         raise NotImplementedError
 
 class GlobalStopLC(Protocol):
@@ -37,10 +40,10 @@ class LocalStopConjunctionLC(LocalStopLC):
     def __init__(self, *subcriteria):
         self.subcriteria = subcriteria
 
-    def check(self, node) -> bool:
+    def check(self, node: NodeBase, data: ndarray, y: ndarray) -> bool:
 
         for criterion in self.subcriteria:
-            if not criterion.check(node): return False
+            if not criterion.check(node, data, y): return False
         
         return True
 
@@ -52,10 +55,10 @@ class LocalStopDisjunctionLC(LocalStopLC):
     def __init__(self, *subcriteria):
         self.subcriteria = subcriteria
 
-    def check(self, node) -> bool:
+    def check(self, node: NodeBase, data: ndarray, y: ndarray) -> bool:
 
         for criterion in self.subcriteria:
-            if criterion.check(node): return True
+            if criterion.check(node, data, y): return True
         
         return False
 
@@ -104,7 +107,7 @@ class LocalStopDepthLC(LocalStopLC):
     def __init__(self, max_depth: int):
         self.depth: int = max_depth
     
-    def check(self, node):
+    def check(self, node: NodeBase, data: ndarray, y: ndarray) -> bool:
         if node.depth >= self.depth:
             logger.debug(f'Local stopping criterion met: node depth {node.depth} meets depth limit {self.depth}')
             return True
@@ -116,16 +119,15 @@ class LocalStopSaturation(LocalStopLC):
         self.saturation: float = saturation
         self.training_only: bool = training_only
 
-    def check(self, node) -> bool:
+    def check(self, node, data: ndarray, y: ndarray) -> bool:
         item = node.item
-        y = item.y
         if self.training_only:
             if hasattr(item, 'n_training'):
                 if item.n_training <= 1:
                     logger.debug(f'Local stopping criterion met: {item.n_training} samples for saturation test.')
                     return True
                 else:
-                    y = item.y[:item.n_training, :]
+                    y = y[:item.n_training, :]
             else:
                 logger.warn(
                     'Node saturation stopping criterion "training_only" flag is mean to be '
@@ -139,7 +141,6 @@ class LocalStopSaturation(LocalStopLC):
             return True
 
         return False
-
 
 
 ## Global stopping criteria

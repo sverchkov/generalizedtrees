@@ -3,177 +3,14 @@
 # Licensed under the BSD 3-Clause License
 # Copyright (c) 2020, Yuriy Sverchkov
 
-from abc import abstractmethod
-from generalizedtrees.generate import DataFactoryLC
+from typing import Callable
 
-from generalizedtrees.givens import DataWithOracleGivensLC, GivensLC, SupervisedDataGivensLC
-from generalizedtrees.leaves import LocalEstimator
-
-import numpy as np
-from generalizedtrees.node import MTNode, Node, NodeBase
-from typing import Callable, Generic, Iterable, Optional, Protocol, Type, TypeVar
-
+from generalizedtrees.givens import GivensLC
+from generalizedtrees.node import NodeBuilderLC
 from generalizedtrees.queues import CanPushPop
 from generalizedtrees.split import SplitConstructorLC, DefaultSplitConstructorLC
 from generalizedtrees.stop import GlobalStopLC, LocalStopLC, NeverStopLC
 from generalizedtrees.tree import Tree
-
-
-###########################
-# Node builder components #
-###########################
-
-N = TypeVar('N', bound=NodeBase)
-
-# Interface definition
-class NodeBuilderLC(Protocol, Generic[N]):
-
-    node_type: Type[N]
-    new_model: Callable[[], LocalEstimator]
-
-    @abstractmethod
-    def initialize(self, givens: GivensLC) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def create_root(self) -> N:
-        raise NotImplementedError
-
-    @abstractmethod
-    def generate_children(self, node: N) -> Iterable[N]:
-        raise NotImplementedError
-
-
-# Implementations
-
-# For supervised learning
-class SupervisedNodeBuilderLC(NodeBuilderLC[Node]):
-
-    data: np.ndarray
-    y: np.ndarray
-
-    def __init__(self, leaf_model: Callable[[], LocalEstimator]) -> None:
-        self.node_type = Node
-        self.new_model = leaf_model
-
-    def initialize(self, givens: GivensLC) -> None:
-        assert(isinstance(givens, SupervisedDataGivensLC))
-        self.data = givens.data_matrix
-        self.y = givens.target_matrix
-    
-    def create_root(self) -> Node:
-        node = self.node_type()
-        node.data = self.data
-        node.y = self.y
-        node.model = self.new_model().fit(node.data, node.y)
-        return node
-    
-    def generate_children(self, node: Node) -> Iterable[Node]:
-        if node.split is not None:
-            branches = node.split.pick_branches(node.data)
-            # TODO: Check that data goes into multiple branches
-            # Or should it be that some data goes to each branch?
-            for b, c in enumerate(node.split.constraints):
-                idx = branches == b
-                # Possible patch: if idx is empty, copy model from parent
-                child = self.node_type()
-                child.data = node.data[idx, :]
-                child.y = node.y[idx, :]
-                child.model = self.new_model().fit(child.data, child.y)
-                child.local_constraint = c
-                yield child
-              
-
-# For model translation
-class ModelTranslationNodeBuilderLC(NodeBuilderLC[MTNode]):
-
-    min_samples: int
-
-    training_data: np.ndarray
-    training_y: Optional[np.ndarray]
-    oracle: Callable
-    data_factory: DataFactoryLC
-
-
-    def __init__(
-        self,
-        leaf_model: Callable[[], LocalEstimator],
-        min_samples: int,
-        data_factory: DataFactoryLC,
-        node_type: Type[MTNode] = MTNode
-    ) -> None:
-        self.node_type = node_type
-        self.new_model = leaf_model
-        self.min_samples = min_samples
-        self.data_factory = data_factory
-    
-
-    def initialize(self, givens: GivensLC) -> None:
-        assert(isinstance(givens, DataWithOracleGivensLC))
-        self.training_data = givens.data_matrix
-        self.training_y = givens.target_matrix
-        self.oracle = givens.oracle
-        self.data_factory.feature_spec = givens.feature_spec
-    
-    def create_root(self) -> MTNode:
-
-        node = self.node_type()
-
-        node.n_training = self.training_data.shape[0]
-
-        node.data_factory = self.data_factory.refit(self.training_data)
-
-        gen_data = node.data_factory.generate(self.min_samples - node.n_training)
-
-        node.data = np.row_stack((self.training_data, gen_data))
-
-        node.y = self.oracle(node.data)
-
-        node.model = self.new_model().fit(node.data, node.y)
-
-        node.constraints = ()
-
-        node.coverage = 1
-
-        return node
-
-    def generate_children(self, node: MTNode) -> Iterable[MTNode]:
-
-        if node.split is not None:
-            branches = node.split.pick_branches(node.data)
-            for b, c in enumerate(node.split.constraints):
-                idx = branches == b
-
-                child = self.node_type()
-
-                child.n_training = idx[0:node.n_training].sum()
-                pregen_data = node.data[idx, :]
-
-                if (pregen_data.shape[0] < self.min_samples):
-                    child.data_factory = node.data_factory.refit(pregen_data[0:child.n_training, :])
-
-                    gen_data = child.data_factory.generate(self.min_samples - pregen_data.shape[0])
-                    gen_y = self.oracle(gen_data)
-
-                else:
-                    child.data_factory = node.data_factory
-                    gen_data = np.empty((0, pregen_data.shape[1]))
-                    gen_y = np.empty((0, node.y.shape[1]))
-
-                child.data = np.row_stack((pregen_data, gen_data))
-                child.y = np.row_stack((node.y[idx, :], gen_y))
-
-                child.model = self.new_model().fit(child.data, child.y)
-
-                child.local_constraint = c
-                child.constraints = node.constraints + (c,)
-
-                if node.n_training <= 0:
-                    child.coverage = 0
-                else:
-                    child.coverage = node.coverage * sum(idx[0:node.n_training]) / node.n_training
-
-                yield child
 
 
 ###########################
@@ -203,12 +40,12 @@ class GreedyBuilderLC:
     def build_tree(self) -> Tree:
 
         # Init root
-        root = self.node_builder.create_root()
+        root, data, y = self.node_builder.create_root()
         tree = Tree([root])
 
         # Init queue
         queue = self.new_queue()
-        queue.push((root, 'root'))
+        queue.push((root, 'root', data, y))
 
         # Init node expansion order tracking
         node_number: int = 0
@@ -216,18 +53,18 @@ class GreedyBuilderLC:
         # Queue-order expansion:
         while queue and not self.global_stop.check(tree):
 
-            node, ptr = queue.pop()
+            node, ptr, data, y = queue.pop()
             node.node_number = node_number
             node_number += 1
 
-            if not self.local_stop.check(tree.node(ptr)):
+            if not self.local_stop.check(tree.node(ptr), data, y):
 
-                node.split = self.splitter.construct_split(node)
+                node.split = self.splitter.construct_split(node, data, y)
 
                 if node.split:
-                    for child in self.node_builder.generate_children(node):
+                    for child, c_data, c_y in self.node_builder.generate_children(node, data, y):
                         child_ptr = tree.add_node(child, parent_key=ptr)
-                        queue.push((child, child_ptr))
+                        queue.push((child, child_ptr, c_data, c_y))
         
         return tree
     

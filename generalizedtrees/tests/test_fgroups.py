@@ -30,7 +30,7 @@ def test_fgroups_method(breast_cancer_data, breast_cancer_rf_model, caplog):
     explainer.global_stop = stop.GlobalStopTreeSizeLC(max_size=5)
     explainer.split_score = split.ProbabilityImpurityLC('entopy')
     explainer.split_generator = split.AxisAlignedSplitGeneratorLC()
-    explainer.node_builder = grow.ModelTranslationNodeBuilderLC(
+    explainer.node_builder = node.ModelTranslationNodeBuilderLC(
         leaf_model=leaves.ConstantEstimator,
         min_samples=1000,
         data_factory=generate.TrepanDataFactoryLC(alpha=0.05, max_attempts=3),
@@ -86,7 +86,7 @@ def test_fgroups_method_bin_data(small_weights_data, small_weights_model, caplog
     explainer.global_stop = stop.GlobalStopTreeSizeLC(max_size=5)
     explainer.split_score = split.ProbabilityImpurityLC('entopy')
     explainer.split_generator = split.AxisAlignedSplitGeneratorLC()
-    explainer.node_builder = grow.ModelTranslationNodeBuilderLC(
+    explainer.node_builder = node.ModelTranslationNodeBuilderLC(
         leaf_model=leaves.ConstantEstimator,
         min_samples=1000,
         data_factory=generate.TrepanDataFactoryLC(alpha=0.05, max_attempts=3),

@@ -4,7 +4,7 @@
 # Copyright (c) 2020, Yuriy Sverchkov
 
 import numpy as np
-from typing import Any, Protocol
+from typing import Optional, Protocol
 
 
 class LocalEstimator(Protocol):
@@ -18,7 +18,8 @@ class LocalEstimator(Protocol):
 
 class ConstantEstimator(LocalEstimator):
 
-    est_vector: np.ndarray
+    def __init__(self) -> None:
+        self.est_vector: Optional[np.ndarray] = None
     
     def fit(self, x=None, y=None, **kwargs):
 
@@ -50,11 +51,9 @@ class SKProbaClassifier(LocalEstimator):
     To fit, converts the y matrix to a label vectors, selecting the maximal component for each instance.
     """
 
-    classifier: Any # Use monkey-typing
-    fallback: bool = True # Whether to fall back to constant estimator when fitting data with one class.
-
     def __init__(self, classifier):
         self.classifier = classifier
+        self.fallback: bool = True # Whether to fall back to constant estimator when fitting data with one class.
     
     def fit(self, x: np.ndarray, y: np.ndarray, **kwargs):
 

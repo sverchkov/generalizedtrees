@@ -7,9 +7,6 @@ from typing import Callable
 from logging import getLogger
 from generalizedtrees.vis.text import TreePrinter
 
-import numpy as np
-from pandas import DataFrame
-
 from generalizedtrees.givens import GivensLC
 from generalizedtrees.grow import GreedyBuilderLC, NodeBuilderLC
 from generalizedtrees.predict import PredictorLC, PredictorTree

@@ -475,11 +475,12 @@ class AUROCSplitScoreLC(SplitScoreLC):
 
 class SplitConstructorLC:
 
-    split_generator: SplitCandidateGeneratorLC
-    split_scorer: SplitScoreLC
-    only_use_training_to_generate: bool
-    only_use_training_to_score: bool
-    infimum_score_to_split: float
+    def __init__(self) -> None:
+        self.split_generator: Optional[SplitCandidateGeneratorLC] = None
+        self.split_scorer: Optional[SplitScoreLC] = None
+        self.only_use_training_to_generate: bool = False
+        self.only_use_training_to_score: bool = False
+        self.infimum_score_to_split: float = -np.inf
 
     def initialize(self, givens: GivensLC) -> None:
         pass
@@ -497,6 +498,7 @@ class DefaultSplitConstructorLC(SplitConstructorLC):
         only_use_training_to_score: bool = False,
         infimum_score_to_split: float = 0
     ) -> None:
+        super().__init__()
         self.only_use_training_to_generate = only_use_training_to_generate
         self.only_use_training_to_score = only_use_training_to_score
         self.infimum_score_to_split = infimum_score_to_split
@@ -504,14 +506,8 @@ class DefaultSplitConstructorLC(SplitConstructorLC):
     def initialize(self, givens: GivensLC) -> None:
         self.split_generator.initialize(givens)
 
-    def construct_split(self, node, data: Optional[np.ndarray] = None, y: Optional[np.ndarray] = None) -> SplitTest:
+    def construct_split(self, node, data: np.ndarray, y: np.ndarray) -> SplitTest:
 
-        if data is None:
-            data = node.data
-        
-        if y is None:
-            y = node.y
-        
         if self.only_use_training_to_generate:
             g_data = data[:node.n_training, :]
             g_y = y[:node.n_training, :]
@@ -835,7 +831,7 @@ class GroupSplitConstructorLC(SplitConstructorLC):
 
         return best
 
-    def _m_of_n_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group) -> ScoredItem:
+    def _m_of_n_split_search(self, node, s_data, s_y, all_constraint_candidates, feature_group, group_label) -> ScoredItem:
 
         # Filter constraint candidates to those within the group
         constraint_candidates = [c for c in all_constraint_candidates if c.feature in feature_group]

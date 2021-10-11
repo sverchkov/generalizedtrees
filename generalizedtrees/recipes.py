@@ -9,7 +9,7 @@ from sklearn.linear_model import LogisticRegression
 from generalizedtrees.node import MTNode, TrepanNode
 from generalizedtrees.generate import SmearingDataFactoryLC, TrepanDataFactoryLC
 from generalizedtrees.leaves import ConstantEstimator, SKProbaClassifier
-from generalizedtrees.grow import ModelTranslationNodeBuilderLC, SupervisedNodeBuilderLC
+from generalizedtrees.node import ModelTranslationNodeBuilderLC, SupervisedNodeBuilderLC
 from generalizedtrees.stop import GlobalStopTreeSizeLC, LocalStopDepthLC, LocalStopDisjunctionLC, LocalStopSaturation
 from generalizedtrees.split import AxisAlignedSplitGeneratorLC, DiscreteInformationGainLC, IJCAI19LRGradientScoreLC, MofNSplitConstructorLC, ProbabilityImpurityLC
 from generalizedtrees.queues import Heap, Queue, Stack
