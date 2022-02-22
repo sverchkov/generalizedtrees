@@ -152,11 +152,11 @@ class PredictorTree:
     Class for decoupling the tree and predictor from the rest of the learning-specific objects
     """
 
-    def __init__(self, tree: Tree, predictor: PredictorLC, printer: Optional[TreePrinter] = None) -> None:
+    def __init__(self, tree: Tree, predictor: PredictorLC, printer: Optional[TreePrinter]=None) -> None:
         self.tree: Tree = tree
         self.predictor: PredictorLC = predictor
         self.printer: TreePrinter = printer
-    
+
     def predict(self, data):
         data_matrix = self._validate_data(data)
         return self.predictor.predict(self.tree, data_matrix)

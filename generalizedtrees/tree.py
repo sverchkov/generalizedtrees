@@ -50,7 +50,7 @@ class Tree(Collection):
             """
             return self.tree.node(self._children[key])
 
-    def __init__(self, contents = []):
+    def __init__(self, contents=()):
         """
         Create a tree
 
@@ -73,9 +73,9 @@ class Tree(Collection):
                 if not isinstance(subtree, Iterable):
                     self.add_node(subtree, parent)
                 else:
-                    it = iter(subtree)
-                    index = self.add_node(next(it), parent)
-                    stack.extend((index, subtr) for subtr in it)
+                    i = iter(subtree)
+                    index = self.add_node(next(i), parent)
+                    stack.extend((index, subtr) for subtr in i)
 
     @property
     def depth(self) -> int:
@@ -85,7 +85,7 @@ class Tree(Collection):
         return len(self._nodes)
 
     def _single_index(self, key):
-        return isinstance(key, int) or key == 'root' 
+        return isinstance(key, int) or key == 'root'
 
     def _1index(self, key):
         k = 0 if key == 'root' else key
