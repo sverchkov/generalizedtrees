@@ -14,7 +14,7 @@ import pandas as pd
 from generalizedtrees.tree import Tree
 
 
-def _estimate_subtree(node: Tree.Node, data_matrix, idx, result_matrix):
+def _estimate_subtree(node: Tree.Node, data_matrix, idx, result_matrix, limiter=lambda _: False):
     """
     Workhorse for estimation using a built tree.
 
@@ -24,9 +24,12 @@ def _estimate_subtree(node: Tree.Node, data_matrix, idx, result_matrix):
     data_matrix: a numpy(-like) matrix of n instances by m features
     idx: a numpy array of numeric instance indexes
     result_matrix: a numpy matrix of outputs
+    limiter: a binary function that takes the node as an argument returns true on nodes to be
+        treated as leaves. Useful for, e.g. getting a "what if we pruned the tree" prediction
+        without actually pruning.
     """
 
-    if node.is_leaf:
+    if node.is_leaf or limiter(node):
         result_matrix[idx,:] = node.item.model.estimate(data_matrix[idx,:])
     
     else:
@@ -37,7 +40,7 @@ def _estimate_subtree(node: Tree.Node, data_matrix, idx, result_matrix):
     return result_matrix
 
 
-def estimate(tree: Tree, data_matrix, target_dimension):
+def estimate(tree: Tree, data_matrix, target_dimension, limiter=lambda _: False):
 
     n = data_matrix.shape[0]
 
@@ -47,7 +50,8 @@ def estimate(tree: Tree, data_matrix, target_dimension):
         np.arange(n, dtype=np.intp),
         np.empty(
             (n, target_dimension),
-            dtype=float))
+            dtype=float),
+        limiter)
 
 
 # Predictor Learner Component:
@@ -69,10 +73,10 @@ class PredictorLC(Protocol):
     def initialize(self, givens: GivensLC) -> 'PredictorLC':
         raise NotImplementedError
 
-    def predict(self, tree: Tree, data_matrix: np.ndarray) -> np.ndarray:
+    def predict(self, tree: Tree, data_matrix: np.ndarray, **args) -> np.ndarray:
         raise NotImplementedError
 
-    def predict_proba(self, tree: Tree, data_matrix: np.ndarray) -> np.ndarray:
+    def predict_proba(self, tree: Tree, data_matrix: np.ndarray, **args) -> np.ndarray:
         raise NotImplementedError
 
 # Regressors
@@ -89,7 +93,7 @@ class RegressorLC(PredictorLC):
     def initialize(self, givens: GivensLC) -> PredictorLC:
         self.target_dim = len(givens.target_names)
 
-    def predict(self, tree: Tree, data_matrix: np.ndarray):
+    def predict(self, tree: Tree, data_matrix: np.ndarray, **args):
         return estimate(tree, data_matrix, self.target_dim)
 
 # Classifiers
@@ -108,9 +112,9 @@ class BaseClassifierLC(PredictorLC):
     def initialize(self, givens: GivensLC) -> PredictorLC:
         self.target_names = givens.target_names
 
-    def predict(self, tree: Tree, data_matrix: np.ndarray):
+    def predict(self, tree: Tree, data_matrix: np.ndarray, **args):
 
-        proba = self.predict_proba(tree, data_matrix)
+        proba = self.predict_proba(tree, data_matrix, **args)
         max_idx = proba.argmax(axis=1)
         return self.target_names[max_idx]
 
@@ -122,9 +126,17 @@ class ClassifierLC(BaseClassifierLC):
     Each dimension of the underlying estimator matches the probability of a target class
     """
 
-    def predict_proba(self, tree: Tree, data_matrix: np.ndarray):
+    def predict_proba(self, tree: Tree, data_matrix: np.ndarray, at_size=None):
 
-        proba = estimate(tree, data_matrix, len(self.target_names))
+        if at_size is None:
+            proba = estimate(tree, data_matrix, len(self.target_names))
+        
+        else:
+            proba = estimate(
+                tree,
+                data_matrix,
+                len(self.target_names),
+                lambda node: False if node.node_number is None else node.node_number > at_size)
 
         return proba
 
@@ -157,17 +169,17 @@ class PredictorTree:
         self.predictor: PredictorLC = predictor
         self.printer: TreePrinter = printer
 
-    def predict(self, data):
+    def predict(self, data, **args):
         data_matrix = self._validate_data(data)
-        return self.predictor.predict(self.tree, data_matrix)
-    
-    def predict_proba(self, data):
+        return self.predictor.predict(self.tree, data_matrix, **args)
+
+    def predict_proba(self, data, **args):
         data_matrix = self._validate_data(data)
-        return self.predictor.predict_proba(self.tree, data_matrix)
-    
+        return self.predictor.predict_proba(self.tree, data_matrix, **args)
+
     def show(self):
         return self.printer.show(self.tree)
-    
+
     def _validate_data(self, data) -> np.ndarray:
 
         # TODO: more validation
