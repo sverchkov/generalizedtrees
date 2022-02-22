@@ -29,7 +29,7 @@ def _estimate_subtree(node: Tree.Node, data_matrix, idx, result_matrix, limiter=
         without actually pruning.
     """
 
-    if node.is_leaf or limiter(node):
+    if node.is_leaf or limiter(node.item):
         result_matrix[idx,:] = node.item.model.estimate(data_matrix[idx,:])
     
     else:
