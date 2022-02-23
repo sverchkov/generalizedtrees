@@ -35,7 +35,7 @@ def _estimate_subtree(node: Tree.Node, data_matrix, idx, result_matrix, limiter=
     else:
         branches = node.item.split.pick_branches(data_matrix[idx,:])
         for b in np.unique(branches):
-            _estimate_subtree(node[b], data_matrix, idx[branches==b], result_matrix)
+            _estimate_subtree(node[b], data_matrix, idx[branches==b], result_matrix, limiter)
 
     return result_matrix
 
