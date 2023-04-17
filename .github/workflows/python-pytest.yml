@@ -22,18 +22,13 @@ jobs:
           - -r testing-requirements.txt -r requirements.txt
         pytest-run-cmd:
           - pytest
-        exclude:
-          - python-version: 3.9
-            requirements-cmd: -r testing-requirements.txt -r requirements.txt
-            pytest-run-cmd: pytest
         include:
           - python-version: 3.8
             requirements-cmd: -r testing-requirements.txt -r oldest
           - python-version: 3.9
-            requirements-cmd: -r testing-requirements.txt -r coverage-requirements.txt -r requirements.txt
-            pytest-run-cmd: |
+            codecov-run-cmd: |
+              python -m pip install -r coverage-requirements.txt
               pytest --cov=generalizedtrees --cov-report xml
-              codecov
 
     steps:
     - uses: actions/checkout@v3
@@ -53,5 +48,12 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
+      if: ${{ !matrix.codecov-run-cmd }}
       run: |
         ${{ matrix.pytest-run-cmd }}
+    - name: Test with pytest and codecov
+      if: ${{ matrix.codecov-run-cmd }}
+      run: ${{ matrix.codecov-run-cmd }}
+    - name: Upload coverage to codecov
+      if: ${{ matrix.codecov-run-cmd }}
+      uses: codecov/codecov-action@v3
