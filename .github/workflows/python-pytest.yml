@@ -17,15 +17,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.9, 3.10]
+        python-version: ["3.9", "3.10"]
         requirements-cmd:
           - -r testing-requirements.txt -r requirements.txt
         pytest-run-cmd:
           - pytest
         include:
-          - python-version: 3.8
+          - python-version: "3.8"
             requirements-cmd: -r testing-requirements.txt -r oldest
-          - python-version: 3.10
+          - python-version: "3.10"
             codecov-run-cmd: |
               python -m pip install -r coverage-requirements.txt
               pytest --cov=generalizedtrees --cov-report xml
