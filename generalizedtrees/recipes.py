@@ -129,7 +129,7 @@ def trepan_logistic(
             penalty = 'l1',
             C = regularization_C,
             solver = 'saga',
-            max_iter = 1000
+            max_iter = 10000
         )
     )
 
