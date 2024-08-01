@@ -56,4 +56,4 @@ jobs:
       run: ${{ matrix.codecov-run-cmd }}
     - name: Upload coverage to codecov
       if: ${{ matrix.codecov-run-cmd }}
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
